@@ -27,7 +27,7 @@ Then, all the ttl-removed sstable is located in the tools/bin/<output path>
 
 `find [full path to the sstable folder]/*Data.db -type f | xargs -I PATH ./TTLRemover PATH -p <output path>`
 
-##### Load ttl-removed SSTable to a new cluster
+#### Load ttl-removed SSTable to a new cluster
 
 1. Create the keyspace and table of the target sstable in the new cluster.
 
