@@ -8,10 +8,10 @@ This tool is implemented for Cassandra version 2.2.
 
 #### Prerequisite
 
-1.Add `noTTL` folder into a src/java/org/apache/cassandra/ folder.
+1. Add `noTTL` folder into a src/java/org/apache/cassandra/ folder.
 
 
-2.`TTLRemover` bash script into tool/bin folder.
+2. `TTLRemover` bash script into tool/bin folder.
 
 #### Compile
 
