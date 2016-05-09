@@ -8,10 +8,18 @@ This tool is implemented for Cassandra version 2.2.
 
 #### Prerequisite
 
-1.Put TTLRemover.java into a src/java/org/apache/cassandra/tool folder, and put TTLRemover bash script into tool/bin folder.
+1.Add `noTTL` folder into a src/java/org/apache/cassandra/ folder.
 
 
-2.In BufferExpiringCell.java, change `return new BufferDeletedCell` to `return BufferExpiringCell`.
+2.`TTLRemover` bash script into tool/bin folder.
+
+#### Compile
+
+1. Open a terminal and change folder to the cassandra root folder
+
+2. Use the following command to comiple the project
+
+`ant generate-idea-files`
 
 
 #### Remove TTL and create new SSTable
@@ -20,7 +28,7 @@ This tool is implemented for Cassandra version 2.2.
 
 `./TTLRemover [full path to the sstable folder>] -p <output path>`
 
-Then, all the ttl-removed sstable is located in the tools/bin/<output path>
+Note: your output path must end with `\`. Then, all the ttl-removed sstable is located in the tools/bin/<output path>
 
 
 2. To do it on bactch, you can use the folloing command:
