@@ -7,11 +7,17 @@ SSTable TTLRemover
 This tool is implemented for Cassandra version 2.2.
 
 #### Prerequisite
+1. Download source code of Cassandra 2.2 using followng command:
 
-1. Add `noTTL` folder into a src/java/org/apache/cassandra/ folder.
+`git clone -b cassandra-2.2 git://git.apache.org/cassandra.git`
 
+2. Link `noTTL` folder into the `src/java/org/apache/cassandra/` folder of cassandra using following command:
 
-2. `TTLRemover` bash script into tool/bin folder.
+`ln -s <abusolute path to the noTTL folder> <abusolute path to src/java/org/apache/cassandra/ folder >`
+
+Note: you must use abusolute path in this command, otherwise some errors would be involed. 
+
+3. `TTLRemover` bash script into tool/bin folder.
 
 #### Compile
 
