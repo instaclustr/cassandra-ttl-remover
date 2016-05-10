@@ -17,7 +17,9 @@ This tool is implemented for Cassandra version 2.2.
 
 Note: you must use abusolute path in this command, otherwise some errors would be involed. 
 
-3. `TTLRemover` bash script into tool/bin folder.
+3. Link `TTLRemover` bash script into `tool/bin` folder of cassandra using the following cammand:
+
+`ln -s <abusolute path to the TTLRemover file> <abusolute path to tool/bin/ folder>`
 
 #### Compile
 
