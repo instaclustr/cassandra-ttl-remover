@@ -43,7 +43,7 @@ This tool is implemented for Cassandra version 2.2.
 
  `./TTLRemover [full path to the sstable folder>] -p <output path>`
 
- Note: your output path must end with `\`. Then, all the ttl-removed sstable is located in the tools/bin/<output path>.
+ Note: your output path must end with `\`. Then, all the ttl-removed sstable is located in the `tools/bin/<output path>`.
 
 
 2. To do it on batch, you can use the following command:
