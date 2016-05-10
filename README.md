@@ -39,7 +39,7 @@ This tool is implemented for Cassandra version 2.2.
 
 #### Remove TTL and create new SSTable
 
-1. Change change foler to cassandra/tool/bin and the command for running the tool is as the following:
+1. Change change folder to cassandra/tool/bin and the command for running the tool is as the following:
 
  `./TTLRemover [full path to the sstable folder>] -p <output path>`
 
