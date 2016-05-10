@@ -22,7 +22,7 @@ This tool is implemented for Cassandra version 2.2.
  `ln -s <absolute path to the noTTL folder> <absolute path to src/java/org/apache/cassandra/ folder>`
 
 
-4. Link `TTLRemover` bash script into `tool/bin` folder of cassandra using the following cammand:
+4. Link `TTLRemover` bash script into `tool/bin` folder of cassandra using the following command:
 
  `ln -s <absolute path to the TTLRemover file> <absolute path to tool/bin/ folder>`
  
@@ -32,7 +32,7 @@ This tool is implemented for Cassandra version 2.2.
 
 1. Open a terminal and change folder to the cassandra root folder.
 
-2. Use the following command to comiple the project.
+2. Use the following command to compile the project.
 
  `ant generate-idea-files`
 
@@ -46,7 +46,7 @@ This tool is implemented for Cassandra version 2.2.
  Note: your output path must end with `\`. Then, all the ttl-removed sstable is located in the tools/bin/<output path>.
 
 
-2. To do it on bactch, you can use the folloing command:
+2. To do it on batch, you can use the following command:
 
  `find [full path to the sstable folder]/*Data.db -type f | xargs -I PATH ./TTLRemover PATH -p <output path>`
  
