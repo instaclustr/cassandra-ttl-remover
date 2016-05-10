@@ -4,7 +4,7 @@ SSTable TTLRemover
 
 ### Usage
 
-This tool is implemented for Cassandra version 2.2.
+This tool is implemented based on Cassandra 2.2.
 
 #### Prerequisite
 1. Download source code of TTLRemover to `TTLRemover` folder using following command:
