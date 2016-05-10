@@ -7,12 +7,15 @@ SSTable TTLRemover
 This tool is implemented based on Cassandra 2.2.
 
 #### Prerequisite
-1. Download source code of TTLRemover to `TTLRemover` folder using following command:
+1. Java 1.8 is needed.
+
+
+2. Download source code of TTLRemover to `TTLRemover` folder using following command:
 
  `git clone https://github.com/instaclustr/TTLRemover.git TTLRemover`
 
 
-2. Download source code of Cassandra 2.2 to `cassandra-2.2-src` folder using followng command:
+3. Download source code of Cassandra 2.2 to `cassandra-2.2-src` folder using followng command:
 
  `git clone -b cassandra-2.2 git://git.apache.org/cassandra.git cassandra-2.2-src`
 
@@ -27,6 +30,10 @@ This tool is implemented based on Cassandra 2.2.
  `ln -s [absolute path to the TTLRemover file] [absolute path to tools/bin/ folder]`
  
  Note: you must use absolute path in this command, otherwise some errors would be involved. 
+ 
+5. Change mode of `TTLRemover` using following command:
+
+ `chmod u+x TTLRemover`
 
 #### Compile
 
