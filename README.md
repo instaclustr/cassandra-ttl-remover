@@ -8,6 +8,7 @@ This tool is implemented for Cassandra version 2.2.
 
 #### Prerequisite
 1. Download source code of TTLRemover to `TTLRemover` folder using following command:
+
  `git clone https://github.com/instaclustr/TTLRemover.git TTLRemover`
 
 
