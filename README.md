@@ -22,7 +22,7 @@ This tool is implemented for Cassandra version 2.2.
  `ln -s <absolute path to the noTTL folder> <absolute path to src/java/org/apache/cassandra/ folder>`
 
 
-4. Link `TTLRemover` bash script into `tool/bin` folder of cassandra using the following command:
+4. Link `TTLRemover` bash script into `tools/bin` folder of cassandra using the following command:
 
  `ln -s <absolute path to the TTLRemover file> <absolute path to tools/bin/ folder>`
  
