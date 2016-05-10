@@ -67,7 +67,6 @@ public class NoTTLScanner implements ISSTableScanner
 
     public static ISSTableScanner getScanner(NoTTLReader sstable, DataRange dataRange, RateLimiter limiter)
     {
-        System.out.println("\n\nhello here it is\n\n");
         return new NoTTLScanner(sstable, dataRange, limiter);
     }
 
