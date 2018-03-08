@@ -155,6 +155,7 @@ public class TTLRemover {
         Util.initDatabaseDescriptor();
 
         Schema.instance.loadFromDisk(false);  //load kspace "systemcf" and its tables;
+        Keyspace.setInitialized();
 
         Descriptor descriptor = Descriptor.fromFilename(fromSSTable);
 
