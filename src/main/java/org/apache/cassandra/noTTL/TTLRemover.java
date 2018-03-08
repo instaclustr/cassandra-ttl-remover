@@ -17,12 +17,6 @@
  */
 package org.apache.cassandra.noTTL;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Iterator;
-
-import org.apache.commons.cli.*;
-
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.*;
@@ -32,8 +26,13 @@ import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.KeyIterator;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
 import org.apache.cassandra.service.ActiveRepairService;
-import org.apache.cassandra.tools.*;
+import org.apache.cassandra.tools.Util;
 import org.apache.cassandra.utils.JVMStabilityInspector;
+import org.apache.commons.cli.*;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Iterator;
 
 /**
  * Do batch TTL removing on table
