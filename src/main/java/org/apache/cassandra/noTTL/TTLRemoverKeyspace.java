@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.noTTL;
 
+import com.google.common.collect.Lists;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.*;
@@ -32,7 +33,12 @@ import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Do batch TTL removing on table
@@ -41,6 +47,7 @@ public class TTLRemoverKeyspace {
     private static CommandLine cmd;
     private static Options options = new Options();;
     private static final String OUTPUT_PATH = "p";
+    private static final String TMP_OUTPUT_PATH = "tmp";
 
     static
     {
@@ -53,11 +60,11 @@ public class TTLRemoverKeyspace {
         long keyCount = countKeys(descriptor);
 
         NoTTLReader noTTLreader = NoTTLReader.open(descriptor);
-
         ISSTableScanner noTTLscanner = noTTLreader.getScanner();
 
         ColumnFamily columnFamily = ArrayBackedSortedColumns.factory.create(descriptor.ksname, descriptor.cfname);
-        SSTableWriter writer = SSTableWriter.create(Descriptor.fromFilename(toSSTable), keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0);
+        Descriptor sstableDesc = Descriptor.fromFilename(toSSTable);
+        SSTableWriter writer = SSTableWriter.create(sstableDesc, keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0);
 
         NoTTLSSTableIdentityIterator row;
 
@@ -71,11 +78,11 @@ public class TTLRemoverKeyspace {
                 columnFamily.clear();
             }
 
-            writer.finish(true);
 
         }
         finally
         {
+            writer.finish(true);
             noTTLscanner.close();
         }
 
@@ -128,8 +135,7 @@ public class TTLRemoverKeyspace {
         return keycount;
     }
 
-    public static void main(String[] args) throws ConfigurationException
-    {
+    public static void main(String[] args) throws ConfigurationException, IOException {
         CommandLineParser parser = new PosixParser();
 
         try
@@ -149,58 +155,61 @@ public class TTLRemoverKeyspace {
             System.exit(1);
         }
 
-        String fromSSTable = new File(cmd.getArgs()[0]).getAbsolutePath();
-        String toSSTable = new File(cmd.getArgs()[0]).getName();
+        String outputFolder = "";
+        if(cmd.hasOption(OUTPUT_PATH))
+        {
+            outputFolder = cmd.getOptionValue(OUTPUT_PATH);
+        }
+        else {
+            printUsage();
+            System.exit(1);
+        }
+
+        Path keyspacePath = Paths.get(cmd.getArgs()[0]).toAbsolutePath();
+        List<Path> sSTables = Files.walk(keyspacePath).filter(f -> f.toString().endsWith("Data.db")).collect(Collectors.toList());
+        sSTables = Lists.reverse(sSTables);
 
         Util.initDatabaseDescriptor();
 
         Schema.instance.loadFromDisk(false);  //load kspace "systemcf" and its tables;
         Keyspace.setInitialized();
+        for (Path sSTable : sSTables) {
+            Descriptor descriptor = Descriptor.fromFilename(sSTable.toAbsolutePath().toFile().getAbsolutePath());
+            if (Schema.instance.getKSMetaData(descriptor.ksname) == null)  {
+                System.err.println(String.format("Filename %s references to nonexistent keyspace: %s!",sSTable, descriptor.ksname));
+                continue;
+            }
 
-        Descriptor descriptor = Descriptor.fromFilename(fromSSTable);
-
-        if (Schema.instance.getKSMetaData(descriptor.ksname) == null)
-        {
-            System.err.println(String.format("Filename %s references to nonexistent keyspace: %s!",fromSSTable, descriptor.ksname));
-            System.exit(1);
-        }
-
-        Keyspace keyspace = Keyspace.open(descriptor.ksname); //load customised keyspace
-
-        ColumnFamilyStore cfStore = null;
-
-        try
-        {
-            cfStore = keyspace.getColumnFamilyStore(descriptor.cfname);
-        }
-        catch (IllegalArgumentException e)
-        {
-            System.err.println(String.format("The provided column family is not part of this cassandra keyspace: keyspace = %s, column family = %s",
-                    descriptor.ksname, descriptor.cfname));
-            System.exit(1);
-        }
-
-        try
-        {
-            if(cmd.hasOption(OUTPUT_PATH))
+            Keyspace keyspace = Keyspace.open(descriptor.ksname); //load customised keyspace
+            ColumnFamilyStore cfStore = null;
+            try
             {
-                String outputFolder = cmd.getOptionValue(OUTPUT_PATH);
+                cfStore = keyspace.getColumnFamilyStore(descriptor.cfname);
+            }
+            catch (IllegalArgumentException e)
+            {
+                System.err.println(String.format("The provided column family is not part of this cassandra keyspace: keyspace = %s, column family = %s",
+                        descriptor.ksname, descriptor.cfname));
+                continue;
+            }
+
+            System.out.println(String.format("Loading file %s from initial keyspace: %s",sSTable, descriptor.ksname));
+
+            try
+            {
+                String toSSTable = sSTable.getFileName().toString();
                 String toSSTableDir = outputFolder+descriptor.ksname+"/"+descriptor.cfname;
                 File directory = new File(toSSTableDir);
                 directory.mkdirs();
-                toSSTable = toSSTableDir+"/"+toSSTable;
-                stream(descriptor, toSSTable);
+                String out = toSSTableDir+"/"+toSSTable;
+                stream(descriptor, out);
+
             }
-            else {
-                printUsage();
-                System.exit(1);
+            catch (Exception e) {
+                JVMStabilityInspector.inspectThrowable(e);
+                e.printStackTrace();
+                System.err.println("ERROR: " + e.getMessage());
             }
-        }
-        catch (Exception e) {
-            JVMStabilityInspector.inspectThrowable(e);
-            e.printStackTrace();
-            System.err.println("ERROR: " + e.getMessage());
-            System.exit(-1);
         }
 
         System.exit(0);
@@ -208,7 +217,7 @@ public class TTLRemoverKeyspace {
 
     private static void printUsage()
     {
-        System.out.printf("Usage: %s <target sstable> -p <output path>",TTLRemover.class.getName());
+        System.out.printf("Usage: %s <target keyspace> -p <output path>",TTLRemoverKeyspace.class.getName());
     }
 
 }
