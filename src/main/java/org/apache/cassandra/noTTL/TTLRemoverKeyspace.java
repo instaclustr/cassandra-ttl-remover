@@ -201,11 +201,15 @@ public class TTLRemoverKeyspace {
                 String toSSTableDir = outputFolder+descriptor.ksname+"/"+descriptor.cfname;
                 File directory = new File(toSSTableDir);
                 directory.mkdirs();
-                String out = toSSTableDir+"/"+toSSTable;
-                stream(descriptor, out);
-
+                String out = toSSTableDir + "/" + toSSTable;
+                File fileOut = new File(out);
+                if(! fileOut.exists()) {
+                    stream(descriptor, out);
+                } else {
+                    System.out.println(String.format("Skip file %s because it is already done",sSTable, descriptor.ksname));
+                }
             }
-            catch (Exception e) {
+            catch (Throwable e) {
                 JVMStabilityInspector.inspectThrowable(e);
                 e.printStackTrace();
                 System.err.println("ERROR: " + e.getMessage());
