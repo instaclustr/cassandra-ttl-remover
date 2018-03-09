@@ -1,7 +1,8 @@
 group 'org.apache.cassandra'
-version '1.0-SNAPSHOT'
+version '1.0'
 
 apply plugin: 'java'
+apply plugin: 'application'
 
 sourceCompatibility = 1.8
 
@@ -14,3 +15,18 @@ dependencies {
     compile group: 'org.apache.cassandra', name: 'cassandra-all', version: '2.2.12'
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
+
+task moreStartScripts(type: CreateStartScripts) {
+    mainClassName = "org.apache.cassandra.noTTL.TTLRemoverKeyspace"
+    applicationName = "TTLRemoverKeyspace"
+    outputDir = new File(project.buildDir, 'scripts')
+    classpath = jar.outputs.files + project.configurations.runtime
+}
+
+applicationDistribution.into("bin") {
+    from(moreStartScripts)
+    fileMode = 0755
+}
+
+
+mainClassName = "org.apache.cassandra.noTTL.TTLRemover"
