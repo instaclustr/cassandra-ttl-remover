@@ -40,7 +40,11 @@ This tool is implemented based on Cassandra 2.2.
 3. Or you can use the command  with no guaranty 
  `./TTLRemoverKeyspace [keyspace path] -p <output path>`
  
- 
+Note: Add VM parameters : 
+```
+-Dcassandra-foreground=yes -Dcassandra.config=file:///C:/SECHERON/apache-cassandra-2.2.8/conf/cassandra.yaml -Dlogback.configurationFile=file:///C:/SECHERON/apache-cassandra-2.2.8/conf/logback.xml -Dcassandra-rackdc.properties=file:///C:/SECHERON/apache-cassandra-2.2.8/conf/cassandra-rackdc.properties -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=7199 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -ea -Xmx1G
+```
+
 #### Load ttl-removed SSTable to a new cluster
 
 1. Create the keyspace and table of the target sstable in the new cluster.
