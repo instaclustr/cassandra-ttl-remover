@@ -39,6 +39,9 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static java.util.Objects.isNull;
 
 /**
  * Do batch TTL removing on table
@@ -64,12 +67,12 @@ public class TTLRemoverKeyspace {
 
         ColumnFamily columnFamily = ArrayBackedSortedColumns.factory.create(descriptor.ksname, descriptor.cfname);
         Descriptor sstableDesc = Descriptor.fromFilename(toSSTable);
-        SSTableWriter writer = SSTableWriter.create(sstableDesc, keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0);
 
         NoTTLSSTableIdentityIterator row;
 
-        try
-        {
+        try (
+                SSTableWriter writer = SSTableWriter.create(sstableDesc, keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0)
+        ){
             while (noTTLscanner.hasNext()) //read data from disk //NoTTLBigTableScanner
             {
                 row = (NoTTLSSTableIdentityIterator) noTTLscanner.next();
@@ -77,12 +80,8 @@ public class TTLRemoverKeyspace {
                 writer.append(row.getKey(), columnFamily);
                 columnFamily.clear();
             }
-
-
         }
-        finally
-        {
-            writer.finish(true);
+        finally {
             noTTLscanner.close();
         }
 
@@ -166,7 +165,15 @@ public class TTLRemoverKeyspace {
         }
 
         Path keyspacePath = Paths.get(cmd.getArgs()[0]).toAbsolutePath();
-        List<Path> sSTables = Files.walk(keyspacePath).filter(f -> f.toString().endsWith("Data.db")).collect(Collectors.toList());
+        List<Path> sSTables = null;
+        try (
+                Stream<Path> stream = Files.walk(keyspacePath);
+        ) {
+            sSTables = stream.filter(f -> f.toString().endsWith("Data.db")).collect(Collectors.toList());
+        }
+        if (isNull(sSTables)) {
+            System.err.println("keyspacePath " + cmd.getArgs()[0] + " is not a folder with ");
+        }
         sSTables = Lists.reverse(sSTables);
 
         Util.initDatabaseDescriptor();
