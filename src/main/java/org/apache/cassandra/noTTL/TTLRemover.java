@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.noTTL;
 
+import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.*;
@@ -26,12 +27,13 @@ import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.KeyIterator;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
 import org.apache.cassandra.service.ActiveRepairService;
-import org.apache.cassandra.tools.Util;
 import org.apache.cassandra.utils.JVMStabilityInspector;
+import org.apache.cassandra.tools.Util;
 import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Iterator;
 
 /**
@@ -44,12 +46,12 @@ public class TTLRemover {
 
     static
     {
-        Option outputPath = new Option(OUTPUT_PATH, true, "Output path, end with '/'");
+        Option outputPath = new Option(OUTPUT_PATH, true, "Output directory");
         options.addOption(outputPath);
     }
 
 
-    private static void stream(Descriptor descriptor, String toSSTable) throws IOException {
+    private static void stream(Descriptor descriptor, Descriptor toSSTable) throws IOException {
         long keyCount = countKeys(descriptor);
 
         NoTTLReader noTTLreader = NoTTLReader.open(descriptor);
@@ -57,7 +59,8 @@ public class TTLRemover {
         ISSTableScanner noTTLscanner = noTTLreader.getScanner();
 
         ColumnFamily columnFamily = ArrayBackedSortedColumns.factory.create(descriptor.ksname, descriptor.cfname);
-        SSTableWriter writer = SSTableWriter.create(Descriptor.fromFilename(toSSTable), keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0);
+
+        SSTableWriter writer = SSTableWriter.create(toSSTable, keyCount, ActiveRepairService.UNREPAIRED_SSTABLE);
 
         NoTTLSSTableIdentityIterator row;
 
@@ -150,9 +153,9 @@ public class TTLRemover {
         }
 
         String fromSSTable = new File(cmd.getArgs()[0]).getAbsolutePath();
-        String toSSTable = new File(cmd.getArgs()[0]).getName();
 
         Util.initDatabaseDescriptor();
+        Config.setClientMode(true);
 
         Schema.instance.loadFromDisk(false);  //load kspace "systemcf" and its tables;
         Keyspace.setInitialized();
@@ -165,45 +168,30 @@ public class TTLRemover {
             System.exit(1);
         }
 
-        Keyspace keyspace = Keyspace.open(descriptor.ksname); //load customised keyspace
-
-        ColumnFamilyStore cfStore = null;
-
-        try
-        {
-            cfStore = keyspace.getColumnFamilyStore(descriptor.cfname);
-        }
-        catch (IllegalArgumentException e)
-        {
-            System.err.println(String.format("The provided column family is not part of this cassandra keyspace: keyspace = %s, column family = %s",
-                    descriptor.ksname, descriptor.cfname));
-            System.exit(1);
-        }
-
         try
         {
             if(cmd.hasOption(OUTPUT_PATH))
             {
                 String outputFolder = cmd.getOptionValue(OUTPUT_PATH);
-                String toSSTableDir = outputFolder+descriptor.ksname+"/"+descriptor.cfname;
+                String toSSTableDir = outputFolder + File.separator + descriptor.ksname + File.separator + descriptor.cfname;
                 File directory = new File(toSSTableDir);
                 directory.mkdirs();
-                toSSTable = toSSTableDir+"/"+toSSTable;
-                stream(descriptor, toSSTable);
+                Descriptor resultDesc = new Descriptor(directory, descriptor.ksname, descriptor.cfname, descriptor.generation, Descriptor.Type.FINAL);
+                stream(descriptor, resultDesc);
             }
-            else {
+            else
+            {
                 printUsage();
                 System.exit(1);
             }
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             JVMStabilityInspector.inspectThrowable(e);
             e.printStackTrace();
             System.err.println("ERROR: " + e.getMessage());
             System.exit(-1);
         }
-
-        System.exit(0);
     }
 
     private static void printUsage()

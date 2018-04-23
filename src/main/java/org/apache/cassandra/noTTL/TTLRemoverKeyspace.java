@@ -18,6 +18,7 @@
 package org.apache.cassandra.noTTL;
 
 import com.google.common.collect.Lists;
+import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.*;
@@ -27,7 +28,8 @@ import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.KeyIterator;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
 import org.apache.cassandra.service.ActiveRepairService;
-import org.apache.cassandra.tools.Util;
+
+import org.apache.cassandra.tools.*;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.commons.cli.*;
 
@@ -59,19 +61,18 @@ public class TTLRemoverKeyspace {
     }
 
 
-    private static void stream(Descriptor descriptor, String toSSTable) throws IOException {
+    private static void stream(Descriptor descriptor, Descriptor toSSTable) throws IOException {
         long keyCount = countKeys(descriptor);
 
         NoTTLReader noTTLreader = NoTTLReader.open(descriptor);
         ISSTableScanner noTTLscanner = noTTLreader.getScanner();
 
         ColumnFamily columnFamily = ArrayBackedSortedColumns.factory.create(descriptor.ksname, descriptor.cfname);
-        Descriptor sstableDesc = Descriptor.fromFilename(toSSTable);
 
         NoTTLSSTableIdentityIterator row;
 
         try (
-                SSTableWriter writer = SSTableWriter.create(sstableDesc, keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0)
+                SSTableWriter writer = SSTableWriter.create(toSSTable, keyCount, ActiveRepairService.UNREPAIRED_SSTABLE,0)
         ){
             while (noTTLscanner.hasNext()) //read data from disk //NoTTLBigTableScanner
             {
@@ -177,6 +178,7 @@ public class TTLRemoverKeyspace {
         sSTables = Lists.reverse(sSTables);
 
         Util.initDatabaseDescriptor();
+        Config.setClientMode(true);
 
         Schema.instance.loadFromDisk(false);  //load kspace "systemcf" and its tables;
         Keyspace.setInitialized();
@@ -187,34 +189,15 @@ public class TTLRemoverKeyspace {
                 continue;
             }
 
-            Keyspace keyspace = Keyspace.open(descriptor.ksname); //load customised keyspace
-            ColumnFamilyStore cfStore = null;
-            try
-            {
-                cfStore = keyspace.getColumnFamilyStore(descriptor.cfname);
-            }
-            catch (IllegalArgumentException e)
-            {
-                System.err.println(String.format("The provided column family is not part of this cassandra keyspace: keyspace = %s, column family = %s",
-                        descriptor.ksname, descriptor.cfname));
-                continue;
-            }
-
             System.out.println(String.format("Loading file %s from initial keyspace: %s",sSTable, descriptor.ksname));
 
             try
             {
-                String toSSTable = sSTable.getFileName().toString();
-                String toSSTableDir = outputFolder+descriptor.ksname+"/"+descriptor.cfname;
+                String toSSTableDir = outputFolder + File.separator + descriptor.ksname + File.separator + descriptor.cfname;
                 File directory = new File(toSSTableDir);
                 directory.mkdirs();
-                String out = toSSTableDir + "/" + toSSTable;
-                File fileOut = new File(out);
-                if(! fileOut.exists()) {
-                    stream(descriptor, out);
-                } else {
-                    System.out.println(String.format("Skip file %s because it is already done",sSTable, descriptor.ksname));
-                }
+                Descriptor resultDesc = new Descriptor(directory, descriptor.ksname, descriptor.cfname, descriptor.generation, Descriptor.Type.FINAL);
+                stream(descriptor, resultDesc);
             }
             catch (Throwable e) {
                 JVMStabilityInspector.inspectThrowable(e);
@@ -222,8 +205,6 @@ public class TTLRemoverKeyspace {
                 System.err.println("ERROR: " + e.getMessage());
             }
         }
-
-        System.exit(0);
     }
 
     private static void printUsage()
