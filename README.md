@@ -22,7 +22,7 @@ This tool is implemented based on Cassandra 2.2.
 
 1. From base directory of repo run the following. This will create the resulting SSTable in the destination directory with the same generation number.
 
-        CASSANDRA_INCLUDE=<path_to_cassandra.in.sh> ./bin/TTLRemover <path_to_SSTable_Data.db> -p <destination_directory>
+        CASSANDRA_INCLUDE=<path_to_cassandra.in.sh> ./TTLRemover <path_to_SSTable_Data.db> -p <destination_directory>
  
 2. To do it on a batch of SSTables, you can use the following command:
 
