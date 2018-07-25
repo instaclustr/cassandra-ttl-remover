@@ -43,6 +43,9 @@ This tool is implemented based on Cassandra 2.2.
  
  
 
+#### Further Information
+
+See Danyang Li's blog ["TTLRemover: Tool for Removing Cassandra TTLs for Recovery and Testing Purposes"](https://www.instaclustr.com/ttlremover-tool-for-removing-cassandra-ttls-for-recovery-and-testing-purposes/)
 
 
 
