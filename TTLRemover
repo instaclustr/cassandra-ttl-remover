@@ -54,4 +54,4 @@ CLASSPATH=$CLASSPATH:./build/libs/TTLRemover-1.0.jar
 "$JAVA" $JAVA_AGENT -cp "$CLASSPATH" $JVM_OPTS -Dstorage-config="$CASSANDRA_CONF" \
         -Dcassandra.storagedir="$cassandra_storagedir" \
         -Dlogback.configurationFile=logback-tools.xml \
-        org.apach
+        org.apache.cassandra.noTTL.TTLRemover
