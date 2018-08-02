@@ -107,7 +107,7 @@ public class TTLRemoverKeyspace {
             }
             else if (cell instanceof BufferDeletedCell)
             {
-
+                columnFamily.addColumn(cell);
             }
             else
                 columnFamily.addColumn(cell);
