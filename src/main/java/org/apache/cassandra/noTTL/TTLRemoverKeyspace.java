@@ -233,7 +233,9 @@ public class TTLRemoverKeyspace {
             {
                 String toSSTableDir = outputFolder + File.separator + descriptor.ksname + File.separator + descriptor.cfname;
                 File directory = new File(toSSTableDir);
-                directory.mkdirs();
+                if(!directory.exists()) {
+                    directory.mkdirs();
+                }
                 Descriptor resultDesc = new Descriptor(directory, descriptor.ksname, descriptor.cfname, descriptor.generation, SSTableFormat.Type.BIG);
                 stream(descriptor, resultDesc);
             }
