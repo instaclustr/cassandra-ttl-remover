@@ -4,7 +4,7 @@ SSTable TTLRemover
 
 ### Usage
 
-This tool is implemented based on Cassandra 2.2.
+This tool is implemented based on Cassandra 2.2. Use branch cassandra-3.0 for Cassandra 3.0 and Cassandra 3.11.
 
 #### Prerequisite
 1. Java 1.8 is needed.
