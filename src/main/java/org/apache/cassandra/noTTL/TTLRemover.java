@@ -103,7 +103,7 @@ public class TTLRemover {
             }
             else if (cell instanceof BufferDeletedCell)
             {
-
+                columnFamily.addColumn(cell);
             }
             else
                 columnFamily.addColumn(cell);
