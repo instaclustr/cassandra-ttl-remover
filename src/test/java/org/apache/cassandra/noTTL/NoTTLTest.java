@@ -45,6 +45,7 @@ public class NoTTLTest {
             UnfilteredRowIterator partition;
 
             boolean tombstoneFound = false;
+            boolean rangeTombstoneFound = false;
 
             try
             {
@@ -91,12 +92,14 @@ public class NoTTLTest {
                                     assertEquals(1533270605297319L, marker.closeDeletionTime(false).markedForDeleteAt());
                                     assert(marker.closeIsInclusive(false));
                                 }
+                                rangeTombstoneFound = true;
                                 break;
                         }
                     }
 
                 }
                 assert(tombstoneFound); //check the tombstone is still there
+                assert(rangeTombstoneFound); //check the tombstone is still there
             }
             finally
             {
