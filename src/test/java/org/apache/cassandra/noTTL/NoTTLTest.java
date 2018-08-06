@@ -99,7 +99,7 @@ public class NoTTLTest {
 
                 }
                 assert(tombstoneFound); //check the tombstone is still there
-                assert(rangeTombstoneFound); //check the tombstone is still there
+                assert(rangeTombstoneFound); //check the range tombstone is still there
             }
             finally
             {
