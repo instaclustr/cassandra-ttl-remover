@@ -47,7 +47,7 @@ This tool is implemented based on Cassandra 2.2. Use branch 3.0 for Cassandra 3.
 
 See Danyang Li's blog ["TTLRemover: Tool for Removing Cassandra TTLs for Recovery and Testing Purposes"](https://www.instaclustr.com/ttlremover-tool-for-removing-cassandra-ttls-for-recovery-and-testing-purposes/)
 
-
+Please see https://www.instaclustr.com/support/documentation/announcements/instaclustr-open-source-project-status/ for Instaclustr support status of this project
 
 
 
