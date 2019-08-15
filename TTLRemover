@@ -15,7 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+set -ex
 if [ "x$CASSANDRA_HOME" != "x" ]; then
     CASSANDRA_INCLUDE=$CASSANDRA_HOME/bin/cassandra.in.sh
 fi
@@ -50,8 +50,9 @@ fi
 
 
 CLASSPATH=$CLASSPATH:./build/libs/TTLRemover-1.0.jar
+#:/home/vince/git/cassandraCE/build/apache-cassandra-3.11.5-SNAPSHOT.jar
 
-"$JAVA" $JAVA_AGENT -cp "$CLASSPATH" $JVM_OPTS -Dcassandra.config="$CASSANDRA_CONF" \
+"$JAVA" $JAVA_AGENT -cp "$CLASSPATH" $JVM_OPTS \
         -Dcassandra.storagedir="$cassandra_storagedir" \
         -Dlogback.configurationFile=logback-tools.xml \
         org.apache.cassandra.noTTL.TTLRemover "$@"
