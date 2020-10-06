@@ -1,0 +1,170 @@
+# TTL remover
+
+image:https://img.shields.io/maven-central/v/com.instaclustr/TTLRemover.svg?label=Maven%20Central[link=https://search.maven.org/search?q=g:%22com.instaclustr%22%20AND%20a:%22TTLRemover%22]
+
+image:https://circleci.com/gh/instaclustr/TTLRemover.svg?style=svg["Instaclustr",link="https://circleci.com/gh/instaclustr/TTLRemover"]
+
+Tool for rewriting SSTables to not contain TTLs.
+
+TTL remover removes TTL information for SSTables by rewriting them and creating new ones so it looks like data have never expired and they will never expired either.
+This is handy for testing scenarios and debugging purposes when we want to have data in Cassandra, visible, but the underlying SSTable expired them in the meanwhile.
+You can then loaded them back e.g. by `sstableloader` to Cassandra.
+
+We are supporting:
+
+* Cassandra 2 line (2.2.18)
+* Cassandra 3 line (3.11.8)
+* Cassandra 4 line (4.0-beta2)
+
+### Usage
+
+The user of this software might either grab the binaries in Maven Central or one may build it on his own.
+
+The project is consisting of these modules:
+
+* impl - the implementation of CLI plugin
+* cassandra-{2,3,4} - the implementation of TTL remover
+
+Each remover for each respective Cassandra version removes TTLs from SSTables little bit differently.
+It is notoriously known that Cassandra is little bit hairy when it comes to re-usability in other projects
+so we are extending a modifying some Cassandra classes by copying them over and rewriting stuff which
+can not be out of the box (e.g. the case for Cassandra 2.2.x is particularly strong here).
+
+The `impl` module contains an interface `SSTableTTLRemover` which all Cassandra-specific modules
+implement. The SPI mechanism will load the concrete remover just because it was put on a class path.
+Hence, the mechanism to switch between Cassandra versions is to place the correct implementation
+JAR on the class path and `impl` module will do the rest.
+
+The released artifacts do not ship Cassandra with it, you have to have `$CASSANDRA_HOME` set, pointing
+to your Cassandra installation for which you need to remove TTL information from SSTables for.
+
+### run.sh script
+
+It is recommended to use `run.sh` helper script if you want to remove TTLs. You are welcome to
+modify this script at its end to support your case. At the bottom, you see:
+
+----
+CLASSPATH=$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-2/target/ttl-remover-cassandra-2.jar
+
+java -cp "$CLASSPATH" $JVM_OPTS \
+    com.instaclustr.cassandra.ttl.cli.CLIApplication \
+    keyspace \
+    --keyspace \
+    /tmp/sstables/test \
+    --output-path \
+    /tmp/stripped \
+    --cassandra-yaml \
+    $CASSANDRA_HOME/conf/cassandra.yaml \
+    --cassandra-storage-dir \
+    $CASSANDRA_HOME/data
+----
+
+Feel free to modify this command in order to achieve what you want. Here, we are going to use
+the implementation of the remover for Cassandra 2 - as you see, all we have to do is to
+put the correct plugin on `$CLASSPATH`.
+
+The CLI tool has two sub-commands:
+
+----
+Usage: <main class> [-V] COMMAND
+  -V, --version   print version information and exit
+Commands:
+  sstable   command for removing TTL from a SSTable
+  keyspace  command for removing TTL from SSTables belonging to a keyspace
+----
+
+If you use `keyspace` command, it is expected that there will be SSTables under `--keyspace` flag like this:
+
+----
+$ tree /tmp/sstables
+/tmp/sstables
+└── test
+    └── test
+        ├── md-1-big-CompressionInfo.db
+        ├── md-1-big-Data.db
+        ├── md-1-big-Digest.crc32
+        ├── md-1-big-Filter.db
+        ├── md-1-big-Index.db
+        ├── md-1-big-Statistics.db
+        ├── md-1-big-Summary.db
+        └── md-1-big-TOC.txt
+----
+
+On the other hand, if you use `sstable` command, it will expect that you will point it to just one SSTable.
+
+There is `help` command for each subcommand:
+
+----
+$ ... help keyspace
+
+Usage: <main class> keyspace [-hV] -c=<cassandraStorageDir> -f=<cassandraYaml>
+                             -ks=[DIRECTORY] -p=[DIRECTORY]
+command for removing TTL from SSTables belonging to a keyspace
+  -p, --output-path=[DIRECTORY]
+                  Destination where SSTable will be generated.
+  -f, --cassandra-yaml=<cassandraYaml>
+                  Path to cassandra.yaml file for loading generated SSTables to
+                    Cassandra
+  -c, --cassandra-storage-dir=<cassandraStorageDir>
+                  Path to cassandra data dir
+      -ks, --keyspace=[DIRECTORY]
+                  Path to keyspace for which all SSTables will have TTL removed.
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+
+----
+
+and for sstable sub-command:
+
+----
+$ ... help sstable
+
+Usage: <main class> sstable [-hV] -c=<cassandraStorageDir> -f=<cassandraYaml>
+                            -p=[DIRECTORY] -ss=[FILE]
+command for removing TTL from a SSTable
+  -p, --output-path=[DIRECTORY]
+                  Destination where SSTable will be generated.
+  -f, --cassandra-yaml=<cassandraYaml>
+                  Path to cassandra.yaml file for loading generated SSTables to
+                    Cassandra
+  -c, --cassandra-storage-dir=<cassandraStorageDir>
+                  Path to cassandra data dir
+      -ss, --sstable=[FILE]
+                  Path to .db file of a SSTable
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+----
+
+In both cases, `--cassandra-storage-dir` is the directory where all your data / SSTables are
+for your Cassandra installation. This has to be specified as, normally, it would point to something like
+`/var/lib/cassandra/data` to have some example. This has to be specified explicitly.
+
+`--cassandra-yaml` is path to your `cassandra.yaml`, this has to be specified explicitly too.
+
+Lastly, there has to be `--output-path` specified too - where your stripped SSTables from TTLs should be.
+
+### Load ttl-removed SSTable to a new cluster
+
+1. Create the keyspace and table of the target sstable in the new cluster.
+
+2. In the source cluster, use the following command to load the ttl-removed SSTable into the new cluster.
+
+        ./sstableloader -d <ip address of new cluster node> [path to the ttl-removed sstable folder]
+
+### Build
+
+----
+$ mvn clean install
+----
+
+Tests are skipped by `mvn clean install -DskipTests`.
+
+Please be sure that your $CASSANDRA_HOME **is not** set. Unit tests are starting an embedded Cassandra
+instance which is setting its own "Cassandra home" and having this set externally would confuse tests
+as it would react to different Cassandra home.
+
+### Further Information
+
+See Danyang Li's blog ["TTLRemover: Tool for Removing Cassandra TTLs for Recovery and Testing Purposes"](https://www.instaclustr.com/ttlremover-tool-for-removing-cassandra-ttls-for-recovery-and-testing-purposes/)
+
+Please see https://www.instaclustr.com/support/documentation/announcements/instaclustr-open-source-project-status/ for Instaclustr support status of this project

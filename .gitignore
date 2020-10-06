@@ -1,36 +1,36 @@
-# Java Runtime
-*.class
+.*
 target/
-!.mvn/wrapper/maven-wrapper.jar
+/bin/
 
-### Gradle ###
-.gradle
-out/
+# Java class files
+*.class
 
-### STS ###
-.apt_generated
+# generated files
+gen/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Eclipse stuff
 .classpath
-.factorypath
 .project
 .settings
-.springBeans
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-nbproject/private/
+# Gradle stuff
+.gradle/
 build/
-nbbuild/
-dist/
-nbdist/
-.nb-gradle/
+.idea/
+out/
+*.iml
 
-### Server Runtime Files/Dirs ###
-**/logs/**
-conf*/**
-**.lock
+# NetBeans project
+**/.nb-gradle/
+**/.nb-gradle-properties
+*.pyc
 
+*.swp
+*.log
+
+dependency-reduced-pom.xml
+
+cassandra.logdir_IS_UNDEFINED
