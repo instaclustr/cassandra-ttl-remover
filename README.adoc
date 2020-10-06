@@ -6,7 +6,7 @@ image:https://circleci.com/gh/instaclustr/TTLRemover.svg?style=svg["Instaclustr"
 
 _Tool for rewriting SSTables to not contain TTLs_
 
-TTL remover removes TTL information for SSTables by rewriting them and creating new ones so it looks like data have never expired and they will never expired either.
+TTL remover removes TTL information for SSTables by rewriting them and creating new ones so it looks like data have never expired and they will never expire either.
 This is handy for testing scenarios and debugging purposes when we want to have data in Cassandra, visible, but the underlying SSTable expired them in the meanwhile.
 You can then loaded them back e.g. by `sstableloader` to Cassandra.
 
