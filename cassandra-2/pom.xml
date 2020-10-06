@@ -26,6 +26,8 @@
     <maven.jar.plugin.version>3.1.1</maven.jar.plugin.version>
     <git.command.plugin.version>2.2.4</git.command.plugin.version>
     <maven.shade.plugin.version>3.2.1</maven.shade.plugin.version>
+  
+    <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
     
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     
