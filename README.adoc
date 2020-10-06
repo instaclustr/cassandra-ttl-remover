@@ -1,10 +1,10 @@
-# TTL remover
+# Cassandra TTL remover
 
 image:https://img.shields.io/maven-central/v/com.instaclustr/TTLRemover.svg?label=Maven%20Central[link=https://search.maven.org/search?q=g:%22com.instaclustr%22%20AND%20a:%22TTLRemover%22]
 
 image:https://circleci.com/gh/instaclustr/TTLRemover.svg?style=svg["Instaclustr",link="https://circleci.com/gh/instaclustr/TTLRemover"]
 
-Tool for rewriting SSTables to not contain TTLs.
+_Tool for rewriting SSTables to not contain TTLs_
 
 TTL remover removes TTL information for SSTables by rewriting them and creating new ones so it looks like data have never expired and they will never expired either.
 This is handy for testing scenarios and debugging purposes when we want to have data in Cassandra, visible, but the underlying SSTable expired them in the meanwhile.
