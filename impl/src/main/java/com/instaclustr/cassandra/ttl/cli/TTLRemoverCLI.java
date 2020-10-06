@@ -1,8 +1,11 @@
 package com.instaclustr.cassandra.ttl.cli;
 
+import static java.util.stream.Collectors.toList;
+
 import java.nio.file.Path;
-import java.util.Iterator;
+import java.util.List;
 import java.util.ServiceLoader;
+import java.util.stream.StreamSupport;
 
 import com.instaclustr.cassandra.ttl.SSTableTTLRemover;
 import picocli.CommandLine.Model.CommandSpec;
@@ -56,12 +59,16 @@ public abstract class TTLRemoverCLI implements Runnable {
     public static SSTableTTLRemover getTTLRemover() throws TTLRemovalException {
         final ServiceLoader<SSTableTTLRemover> serviceLoader = ServiceLoader.load(SSTableTTLRemover.class);
 
-        final Iterator<SSTableTTLRemover> iterator = serviceLoader.iterator();
+        final List<SSTableTTLRemover> removers = StreamSupport.stream(serviceLoader.spliterator(), false).collect(toList());
 
-        if (iterator.hasNext()) {
-            return iterator.next();
+        if (removers.size() == 0) {
+            throw new TTLRemovalException("Unable to locate an instance of SSTableTTLRemover on the class path.");
+        } else if (removers.size() != 1) {
+            throw new TTLRemovalException(String.format("There is %s implementations of %s on the class path, there needs to be just one!",
+                                                        removers.size(),
+                                                        SSTableTTLRemover.class.getName()));
         }
 
-        throw new TTLRemovalException("Unable to locate an instance of SSTableTTLRemover on the class path.");
+        return removers.get(0);
     }
 }
