@@ -1,5 +1,6 @@
 package org.apache.cassandra.ttl;
 
+import static com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI.CassandraVersion.V2;
 import static java.lang.String.format;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
@@ -23,7 +24,6 @@ import com.github.nosan.embedded.cassandra.EmbeddedCassandraFactory;
 import com.github.nosan.embedded.cassandra.api.Cassandra;
 import com.github.nosan.embedded.cassandra.api.Version;
 import com.github.nosan.embedded.cassandra.artifact.Artifact;
-import com.instaclustr.cassandra.ttl.cli.KeyspaceTTLRemoverCLI;
 import com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI;
 import com.instaclustr.sstable.generator.BulkLoader;
 import com.instaclustr.sstable.generator.CassandraBulkLoader;
@@ -98,7 +98,7 @@ public class Cassandra2TTLRemoverTest {
 
             System.setProperty("ttl.remover.tests", "true");
 
-            TTLRemoverCLI.setProperties(findCassandraYaml(new File("target/cassandra-2/conf").toPath()), cassandraDir.resolve("data").toAbsolutePath());
+            TTLRemoverCLI.setProperties(findCassandraYaml(new File("target/cassandra-2/conf").toPath()), cassandraDir.resolve("data").toAbsolutePath(), V2);
 
             final BulkLoaderSpec bulkLoaderSpec = new BulkLoaderSpec();
 
@@ -149,7 +149,7 @@ public class Cassandra2TTLRemoverTest {
             cassandra = cassandraFactory.create();
             cassandra.start();
 
-            TTLRemoverCLI.setProperties(findCassandraYaml(new File("target/cassandra-2/conf").toPath()), cassandraDir.resolve("data").toAbsolutePath());
+            TTLRemoverCLI.setProperties(findCassandraYaml(new File("target/cassandra-2/conf").toPath()), cassandraDir.resolve("data").toAbsolutePath(), V2);
             Config.setClientMode(false);
 
             executeWithSession(session -> {
@@ -161,8 +161,9 @@ public class Cassandra2TTLRemoverTest {
 
             logger.info("Removing TTLs ...");
 
-            KeyspaceTTLRemoverCLI.main(new String[]{
-                "--keyspace",
+            TTLRemoverCLI.main(new String[]{
+                "--cassandra-version=2",
+                "--sstables",
                 bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
                 "--output-path",
                 noTTLSSTables.getRoot().toPath().toString(),

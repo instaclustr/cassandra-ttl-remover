@@ -6,17 +6,17 @@
   <parent>
     <groupId>com.instaclustr</groupId>
     <artifactId>ttl-remover-parent</artifactId>
-    <version>1.0</version>
+    <version>1.1.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
-
+  
   <artifactId>ttl-remover-cassandra-2</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   
   <properties>
-    <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
-    <picocli.version>4.0.4</picocli.version>
+    <version.cassandra>2.2.18</version.cassandra>
     
+    <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
     <version.generator>1.2</version.generator>
     <version.awaitility>4.0.3</version.awaitility>
     <junit.version>4.12</junit.version>
@@ -26,7 +26,7 @@
     <maven.jar.plugin.version>3.1.1</maven.jar.plugin.version>
     <git.command.plugin.version>2.2.4</git.command.plugin.version>
     <maven.shade.plugin.version>3.2.1</maven.shade.plugin.version>
-  
+    
     <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
     
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -39,14 +39,14 @@
     <dependency>
       <groupId>com.instaclustr</groupId>
       <artifactId>ttl-remover-impl</artifactId>
-      <version>1.0.0</version>
+      <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-all</artifactId>
-      <version>2.2.18</version>
+      <version>${version.cassandra}</version>
       <scope>provided</scope>
     </dependency>
     

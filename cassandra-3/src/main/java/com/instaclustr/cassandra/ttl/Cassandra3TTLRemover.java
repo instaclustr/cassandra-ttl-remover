@@ -4,15 +4,14 @@ import static java.lang.String.format;
 
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
 import org.apache.cassandra.config.CFMetaData;
-import org.apache.cassandra.config.Config;
-import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.config.Schema;
+import org.apache.cassandra.cql3.QueryProcessor;
+import org.apache.cassandra.cql3.statements.CFStatement;
+import org.apache.cassandra.cql3.statements.CreateTableStatement;
 import org.apache.cassandra.db.ClusteringBound;
-import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.LivenessInfo;
 import org.apache.cassandra.db.RangeTombstone;
 import org.apache.cassandra.db.SerializationHeader;
@@ -28,14 +27,16 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.Row.Builder;
 import org.apache.cassandra.db.rows.Unfiltered;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.KeyIterator;
+import org.apache.cassandra.io.sstable.SSTable;
 import org.apache.cassandra.io.sstable.SSTableRewriter;
 import org.apache.cassandra.io.sstable.format.SSTableFormat;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
-import org.apache.cassandra.tools.Util;
+import org.apache.cassandra.schema.Types;
 import org.apache.cassandra.utils.FBUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,75 +46,66 @@ public class Cassandra3TTLRemover implements SSTableTTLRemover {
     private static final Logger logger = LoggerFactory.getLogger(Cassandra3TTLRemover.class);
 
     @Override
-    public void executeRemoval(final Path outputFolder, final Collection<Path> sstables) throws TTLRemovalException {
+    public void executeRemoval(final Path outputFolder, final Collection<Path> sstables, final String cql) throws Exception {
+        for (final Path sstable : sstables) {
 
-        if (!DatabaseDescriptor.isToolInitialized()) {
-            DatabaseDescriptor.toolInitialization(false);
-        }
+            final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
 
-        Util.initDatabaseDescriptor();
-        Config.setClientMode(true);
+            logger.info(format("Loading file %s from initial keyspace: %s", sstable, descriptor.ksname));
 
-        try {
-            Schema.instance.loadFromDisk(false);
-        } catch (final Exception ex) {
+            final Path newSSTableDestinationDir = outputFolder.resolve(descriptor.ksname).resolve(descriptor.cfname);
 
-        }
-
-        Keyspace.setInitialized();
-
-        try {
-            for (final Path sstable : sstables) {
-
-                final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
-
-                if (Schema.instance.getKSMetaData(descriptor.ksname) == null) {
-                    logger.warn(format("Filename %s references to nonexistent keyspace: %s!", sstable, descriptor.ksname));
-                    continue;
+            if (!newSSTableDestinationDir.toFile().exists()) {
+                if (!newSSTableDestinationDir.toFile().mkdirs()) {
+                    throw new TTLRemovalException(format("Unable to create directories leading to %s.", newSSTableDestinationDir.toFile().getAbsolutePath()));
                 }
-
-                logger.info(format("Loading file %s from initial keyspace: %s", sstable, descriptor.ksname));
-
-                final Path newSSTableDestinationDir = outputFolder.resolve(descriptor.ksname).resolve(descriptor.cfname);
-
-                if (!newSSTableDestinationDir.toFile().exists()) {
-                    if (!newSSTableDestinationDir.toFile().mkdirs()) {
-                        throw new TTLRemovalException(format("Unable to create directories leading to %s.", newSSTableDestinationDir.toFile().getAbsolutePath()));
-                    }
-                }
-
-                final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
-                                                             descriptor.ksname,
-                                                             descriptor.cfname,
-                                                             descriptor.generation,
-                                                             SSTableFormat.Type.BIG);
-                stream(descriptor, resultDesc);
             }
-        } catch (final Exception ex) {
-            throw new TTLRemovalException("Unable to remove TTL from SSTable-s.", ex);
+
+            final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
+                                                         descriptor.ksname,
+                                                         descriptor.cfname,
+                                                         descriptor.generation,
+                                                         SSTableFormat.Type.BIG);
+
+            CFStatement parsed = (CFStatement) QueryProcessor.parseStatement(cql);
+            parsed.prepareKeyspace(descriptor.ksname);
+            CreateTableStatement statement = (CreateTableStatement) ((CreateTableStatement.RawStatement) parsed).prepare(Types.none()).statement;
+
+            CFMetaData cfMetadata = statement.metadataBuilder()
+                .withId(CFMetaData.generateLegacyCfId(descriptor.ksname, statement.columnFamily()))
+                .withPartitioner(new Murmur3Partitioner())
+                .build()
+                .params(statement.params())
+                .readRepairChance(0.0)
+                .dcLocalReadRepairChance(0.0)
+                .gcGraceSeconds(0)
+                .memtableFlushPeriod((int) TimeUnit.HOURS.toMillis(1));
+
+            stream(descriptor, resultDesc, cfMetadata);
         }
     }
 
-    public void stream(final Descriptor descriptor, final Descriptor toSSTable) throws TTLRemovalException {
+    public void stream(final Descriptor descriptor, final Descriptor toSSTable, final CFMetaData cfMetadata) throws TTLRemovalException {
 
         final SSTableReader noTTLreader;
 
         try {
-            noTTLreader = SSTableReader.open(descriptor);
+            noTTLreader = SSTableReader.open(descriptor, SSTable.componentsFor(descriptor), cfMetadata, true, true);
         } catch (final Exception ex) {
             throw new TTLRemovalException(format("Unable to open descriptor %s", descriptor.baseFilename()), ex);
         }
 
-        final ColumnFamilyStore columnFamily = ColumnFamilyStore.getIfExists(descriptor.ksname, descriptor.cfname);
-
-        final long keyCount = countKeys(descriptor, columnFamily.metadata);
+        final long keyCount = countKeys(descriptor, cfMetadata);
 
         final LifecycleTransaction txn = LifecycleTransaction.offline(OperationType.WRITE);
 
-        final SerializationHeader header = SerializationHeader.makeWithoutStats(columnFamily.metadata);
+        final SerializationHeader header = SerializationHeader.makeWithoutStats(cfMetadata);
 
         final SSTableRewriter writer = SSTableRewriter.constructKeepingOriginals(txn, true, Long.MAX_VALUE);
-        writer.switchWriter(SSTableWriter.create(toSSTable.toString(), keyCount, -1, header, null, txn));
+
+        writer.switchWriter(SSTableWriter.create(cfMetadata, toSSTable, keyCount, -1, 0, header, null, txn));
+
+        //writer.switchWriter(SSTableWriter.create(toSSTable.toString(), keyCount, -1, header, null, txn));
 
         try (final ISSTableScanner noTTLscanner = noTTLreader.getScanner()) {
             while (noTTLscanner.hasNext()) {
@@ -125,7 +117,7 @@ public class Cassandra3TTLRemover implements SSTableTTLRemover {
                     continue;
                 }
 
-                final PartitionUpdate update = new PartitionUpdate(columnFamily.metadata, partition.partitionKey(), partition.columns(), 2);
+                final PartitionUpdate update = new PartitionUpdate(cfMetadata, partition.partitionKey(), partition.columns(), 2);
 
                 while (partition.hasNext()) {
 
@@ -156,7 +148,7 @@ public class Cassandra3TTLRemover implements SSTableTTLRemover {
             }
             writer.finish();
         } catch (final Exception ex) {
-            throw new TTLRemovalException(format("Exception occured while scanning SSTable %s", descriptor.baseFilename()), ex);
+            throw new TTLRemovalException(format("Exception occurred while scanning SSTable %s", descriptor.baseFilename()), ex);
         }
     }
 
