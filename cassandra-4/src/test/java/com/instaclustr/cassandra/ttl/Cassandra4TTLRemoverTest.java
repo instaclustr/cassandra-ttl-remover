@@ -17,13 +17,13 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.github.nosan.embedded.cassandra.EmbeddedCassandraFactory;
 import com.github.nosan.embedded.cassandra.api.Cassandra;
 import com.github.nosan.embedded.cassandra.api.Version;
 import com.github.nosan.embedded.cassandra.artifact.Artifact;
-import com.instaclustr.cassandra.ttl.cli.KeyspaceTTLRemoverCLI;
 import com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI;
 import com.instaclustr.sstable.generator.BulkLoader;
 import com.instaclustr.sstable.generator.CassandraBulkLoader;
@@ -69,6 +69,8 @@ public class Cassandra4TTLRemoverTest {
     @Test
     public void removeTTL() throws InterruptedException {
 
+        System.out.println(System.getProperty("java.library.path"));
+
         Path cassandraDir = new File("target/cassandra-4").toPath().toAbsolutePath();
 
         EmbeddedCassandraFactory cassandraFactory = new EmbeddedCassandraFactory();
@@ -90,12 +92,9 @@ public class Cassandra4TTLRemoverTest {
                 session.execute(String.format("CREATE TABLE IF NOT EXISTS %s.%s (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;", KEYSPACE, TABLE));
             });
 
-            // SSTable generation
-
-            System.setProperty("ttl.remover.tests", "true");
-
-            TTLRemoverCLI.setProperties(findCassandraYaml(new File("target/cassandra-4/conf").toPath()), cassandraDir.resolve("data").toAbsolutePath());
-
+            // this has to be here for streaming in loader ... yeah, just here
+            System.setProperty("cassandra.storagedir", cassandraDir.resolve("data").toAbsolutePath().toString());
+            System.setProperty("cassandra.config", "file://" + findCassandraYaml(new File("target/cassandra-4/conf").toPath()).toAbsolutePath().toString());
             DatabaseDescriptor.toolInitialization(false);
 
             final BulkLoaderSpec bulkLoaderSpec = new BulkLoaderSpec();
@@ -140,6 +139,20 @@ public class Cassandra4TTLRemoverTest {
 
             cassandra.stop();
 
+            logger.info("Removing TTLs ...");
+
+            // remove ttls
+
+            TTLRemoverCLI.main(new String[]{
+                "--cassandra-version=4",
+                "--sstables",
+                bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
+                "--output-path",
+                noTTLSSTables.getRoot().toPath().toString(),
+                "--cql",
+                "CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;"
+            }, false);
+
             // start new Cassandra instance
 
             cassandra = cassandraFactory.create();
@@ -150,36 +163,29 @@ public class Cassandra4TTLRemoverTest {
                 session.execute(String.format("CREATE TABLE IF NOT EXISTS %s.%s (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;", KEYSPACE, TABLE));
             });
 
-            logger.info("Removing TTLs ...");
-
-            // remove ttls
-
-            KeyspaceTTLRemoverCLI.main(new String[]{
-                "--keyspace",
-                bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
-                "--output-path",
-                noTTLSSTables.getRoot().toPath().toString(),
-                "--cassandra-yaml",
-                findCassandraYaml(new File("target/cassandra-4/conf").toPath()).toAbsolutePath().toString(),
-                "--cassandra-storage-dir",
-                new File("target/cassandra-4/data/data").getAbsolutePath(),
-            }, false);
-
             // import it into Cassandra
+
+            final CassandraBulkLoader cassandraBulkLoader2 = new Cassandra4CustomBulkLoader();
+            cassandraBulkLoader2.cassandraBulkLoaderSpec = cassandraBulkLoaderSpec;
 
             final CassandraBulkLoaderSpec cassandraBulkLoaderSpec2 = new CassandraBulkLoaderSpec();
 
             cassandraBulkLoaderSpec2.node = "127.0.0.1";
             cassandraBulkLoaderSpec2.cassandraYaml = findCassandraYaml(new File("target/cassandra-4/conf").toPath());
             cassandraBulkLoaderSpec2.sstablesDir = Paths.get(noTTLSSTables.getRoot().getAbsolutePath(), KEYSPACE, TABLE);
-            cassandraBulkLoaderSpec2.cassandraVersion = CassandraVersion.V3;
+            cassandraBulkLoaderSpec2.cassandraVersion = CassandraVersion.V4;
+            cassandraBulkLoaderSpec2.keyspace = KEYSPACE;
 
-            cassandraBulkLoader.cassandraBulkLoaderSpec = cassandraBulkLoaderSpec2;
-            cassandraBulkLoader.run();
+            cassandraBulkLoader2.cassandraBulkLoaderSpec = cassandraBulkLoaderSpec2;
+            cassandraBulkLoader2.run();
 
             // but here, we have them!
             try (final Cluster cluster = Cluster.builder().addContactPoint("127.0.0.1").withPort(9042).build(); final Session session = cluster.connect()) {
-                assertEquals(3, session.execute(QueryBuilder.select().all().from("test", "test")).all().size());
+                List<Row> results = session.execute(QueryBuilder.select().all().from("test", "test")).all();
+
+                results.forEach(row -> logger.info(format("id: %s, name: %s, surname: %s", row.getUUID("id"), row.getString("name"), row.getString("surname"))));
+
+                assertEquals(3, results.size());
             }
         } finally {
             if (cassandra != null) {

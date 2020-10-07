@@ -7,8 +7,6 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
-import com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI;
-import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
@@ -34,25 +32,17 @@ public class Cassandra2TTLRemover implements SSTableTTLRemover {
     private static final Logger logger = LoggerFactory.getLogger(Cassandra2TTLRemover.class);
 
     @Override
-    public void executeRemoval(final Path outputFolder, final Collection<Path> sstables) throws TTLRemovalException {
+    public void executeRemoval(final Path outputFolder, final Collection<Path> sstables, final String cql) throws Exception {
 
         if (!Boolean.parseBoolean(System.getProperty("ttl.remover.tests", "false"))) {
             DatabaseDescriptor.forceStaticInitialization();
         }
 
-        //DatabaseDescriptor.forceStaticInitialization();
-
-        //Config.setClientMode(true);
-
         Config.setClientMode(false);
-
-        //Util.initDatabaseDescriptor();
 
         if (Boolean.parseBoolean(System.getProperty("ttl.remover.tests", "false"))) {
             DatabaseDescriptor.applyConfig(DatabaseDescriptor.loadConfig());
         }
-
-        //DatabaseDescriptor.applyConfig(DatabaseDescriptor.loadConfig());
 
         try {
             Schema.instance.loadFromDisk(false);
@@ -61,37 +51,33 @@ public class Cassandra2TTLRemover implements SSTableTTLRemover {
         }
         Keyspace.setInitialized();
 
-        try {
-            for (final Path sstable : sstables) {
+        for (final Path sstable : sstables) {
 
-                final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
+            final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
 
-                if (Schema.instance.getKSMetaData(descriptor.ksname) == null) {
-                    logger.warn(format("Filename %s references to nonexistent keyspace: %s!", sstable, descriptor.ksname));
-                    continue;
-                }
-
-                logger.info(format("Loading file %s from initial keyspace: %s", sstable, descriptor.ksname));
-
-                final Path newSSTableDestinationDir = outputFolder.resolve(descriptor.ksname).resolve(descriptor.cfname);
-
-                if (!newSSTableDestinationDir.toFile().exists()) {
-                    if (!newSSTableDestinationDir.toFile().mkdirs()) {
-                        throw new TTLRemovalException(format("Unable to create directories leading to %s.", newSSTableDestinationDir.toFile().getAbsolutePath()));
-                    }
-                }
-
-                final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
-                                                             descriptor.ksname,
-                                                             descriptor.cfname,
-                                                             descriptor.generation,
-                                                             Type.FINAL,
-                                                             SSTableFormat.Type.BIG);
-
-                stream(descriptor, resultDesc);
+            if (Schema.instance.getKSMetaData(descriptor.ksname) == null) {
+                logger.warn(format("Filename %s references to nonexistent keyspace: %s!", sstable, descriptor.ksname));
+                continue;
             }
-        } catch (final Exception ex) {
-            throw new TTLRemovalException("Unable to remove TTL from SSTable-s.", ex);
+
+            logger.info(format("Loading file %s from initial keyspace: %s", sstable, descriptor.ksname));
+
+            final Path newSSTableDestinationDir = outputFolder.resolve(descriptor.ksname).resolve(descriptor.cfname);
+
+            if (!newSSTableDestinationDir.toFile().exists()) {
+                if (!newSSTableDestinationDir.toFile().mkdirs()) {
+                    throw new TTLRemovalException(format("Unable to create directories leading to %s.", newSSTableDestinationDir.toFile().getAbsolutePath()));
+                }
+            }
+
+            final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
+                                                         descriptor.ksname,
+                                                         descriptor.cfname,
+                                                         descriptor.generation,
+                                                         Type.FINAL,
+                                                         SSTableFormat.Type.BIG);
+
+            stream(descriptor, resultDesc);
         }
     }
 

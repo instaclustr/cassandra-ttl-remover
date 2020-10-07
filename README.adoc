@@ -24,6 +24,7 @@ The project is consisting of these modules:
 
 * impl - the implementation of CLI plugin
 * cassandra-{2,3,4} - the implementation of TTL remover
+* buddy-agent - Byte Buddy agent used upon Cassandra 3 and 4 TTL removal
 
 Each remover for each respective Cassandra version removes TTLs from SSTables little bit differently.
 It is notoriously known that Cassandra is little bit hairy when it comes to re-usability in other projects
@@ -34,6 +35,13 @@ The `impl` module contains an interface `SSTableTTLRemover` which all Cassandra-
 implement. The SPI mechanism will load the concrete remover just because it was put on a class path.
 Hence, the mechanism to switch between Cassandra versions is to place the correct implementation
 JAR on the class path and `impl` module will do the rest.
+
+`buddy-agent` contains agent which is used upon execution for Cassandra 3 and 4 TTL removal. The purpose of this
+module is to mock some `DatabaseDescriptor` static methods. Normally, this class is initialized when a Cassandra process run
+but we are not running anything. The removal logic uses these methods, normally, we would have to have
+proper database schema in `$CASSANDRA_HOME/data` and logic which deals with reading and writing SSTables
+would also fetch data from system tables, for example. This is not desirable and by introducing this module,
+there is nothing necessary but `$CASSANDRA_HOME` with libs / jars so we can populate the classpath.
 
 The released artifacts do not ship Cassandra with it, you have to have `$CASSANDRA_HOME` set, pointing
 to your Cassandra installation for which you need to remove TTL information from SSTables for.
@@ -46,11 +54,12 @@ modify this script at its end to support your case. At the bottom, you see:
 ----
 CLASSPATH=$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-2/target/ttl-remover-cassandra-2.jar
 
-java -cp "$CLASSPATH" $JVM_OPTS \
-    com.instaclustr.cassandra.ttl.cli.CLIApplication \
-    keyspace \
-    --keyspace \
-    /tmp/sstables/test \
+java -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-2/target/ttl-remover-cassandra-2.jar"
+    \$JVM_OPTS \
+    com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI \
+    --cassandra-version=2 \
+    --sstables \
+    /tmp/sstables2/test \
     --output-path \
     /tmp/stripped \
     --cassandra-yaml \
@@ -59,85 +68,61 @@ java -cp "$CLASSPATH" $JVM_OPTS \
     $CASSANDRA_HOME/data
 ----
 
-Feel free to modify this command in order to achieve what you want. Here, we are going to use
-the implementation of the remover for Cassandra 2 - as you see, all we have to do is to
-put the correct plugin on `$CLASSPATH`.
-
-The CLI tool has two sub-commands:
-
-----
-Usage: <main class> [-V] COMMAND
-  -V, --version   print version information and exit
-Commands:
-  sstable   command for removing TTL from a SSTable
-  keyspace  command for removing TTL from SSTables belonging to a keyspace
-----
-
-If you use `keyspace` command, it is expected that there will be SSTables under `--keyspace` flag like this:
+On the other hand, for Cassandra 3 / 4, the command would look like this. Notice we are using
+byte-buddy agent unlike for Cassandra 2 case and we are also specifying CQL statement as we
+not have have access to `data` dir (it may be completely empty) but we need to construct metadata
+upon TTL removal, we do it programmatically.
 
 ----
-$ tree /tmp/sstables
-/tmp/sstables
-└── test
-    └── test
-        ├── md-1-big-CompressionInfo.db
-        ├── md-1-big-Data.db
-        ├── md-1-big-Digest.crc32
-        ├── md-1-big-Filter.db
-        ├── md-1-big-Index.db
-        ├── md-1-big-Statistics.db
-        ├── md-1-big-Summary.db
-        └── md-1-big-TOC.txt
+java -javaagent:./buddy-agent/target/byte-buddy-agent.jar \
+    -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-3/target/ttl-remover-cassandra-3.jar" \
+    $JVM_OPTS \
+    com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI \
+    --cassandra-version=3 \
+    --sstables \
+    /tmp/original-3/test/test \
+    --output-path \
+    /tmp/stripped \
+    --cql \
+    'CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;'
 ----
 
-On the other hand, if you use `sstable` command, it will expect that you will point it to just one SSTable.
-
-There is `help` command for each subcommand:
+All configuration options are as follows, you get this by `help` command, just after class specification:
 
 ----
-$ ... help keyspace
-
-Usage: <main class> keyspace [-hV] -c=<cassandraStorageDir> -f=<cassandraYaml>
-                             -ks=[DIRECTORY] -p=[DIRECTORY]
-command for removing TTL from SSTables belonging to a keyspace
+Usage: ttl-remove [-hV] [-c=[INTEGER]] [-d=[DIRECTORY]] [-f=[FILE]] -p=
+                  [DIRECTORY] [-q=[CQL]] [-s=[DIRECTORY]] [-t=[FILE]]
+command for removing TTL from SSTables
   -p, --output-path=[DIRECTORY]
-                  Destination where SSTable will be generated.
-  -f, --cassandra-yaml=<cassandraYaml>
-                  Path to cassandra.yaml file for loading generated SSTables to
-                    Cassandra
-  -c, --cassandra-storage-dir=<cassandraStorageDir>
-                  Path to cassandra data dir
-      -ks, --keyspace=[DIRECTORY]
-                  Path to keyspace for which all SSTables will have TTL removed.
-  -h, --help      Show this help message and exit.
-  -V, --version   Print version information and exit.
+                         Destination where SSTable will be generated.
+  -f, --cassandra-yaml=[FILE]
+                         Path to cassandra.yaml file for loading generated
+                           SSTables to Cassandra, relevant only in case of
+                           Cassandra 2.
+  -d, --cassandra-storage-dir=[DIRECTORY]
+                         Path to cassandra data dir, relevant only in case of
+                           Cassandra 2.
+  -s, --sstables=[DIRECTORY]
+                         Path to a directory for which all SSTables will have
+                           TTL removed.
+  -t, --sstable=[FILE]   Path to .db file of a SSTable which will have TTL
+                           removed.
+  -c, --cassandra-version=[INTEGER]
+                         Version of Cassandra to remove TTL for, might be 2, 3
+                           or 4, defaults to 3
+  -q, --cql=[CQL]        CQL statement which creates table we want to remove
+                           TTL from. This has to be set in case
+                           --cassandra-version is 3 or 4
+  -h, --help             Show this help message and exit.
+  -V, --version          Print version information and exit.
 
 ----
 
-and for sstable sub-command:
-
-----
-$ ... help sstable
-
-Usage: <main class> sstable [-hV] -c=<cassandraStorageDir> -f=<cassandraYaml>
-                            -p=[DIRECTORY] -ss=[FILE]
-command for removing TTL from a SSTable
-  -p, --output-path=[DIRECTORY]
-                  Destination where SSTable will be generated.
-  -f, --cassandra-yaml=<cassandraYaml>
-                  Path to cassandra.yaml file for loading generated SSTables to
-                    Cassandra
-  -c, --cassandra-storage-dir=<cassandraStorageDir>
-                  Path to cassandra data dir
-      -ss, --sstable=[FILE]
-                  Path to .db file of a SSTable
-  -h, --help      Show this help message and exit.
-  -V, --version   Print version information and exit.
-----
-
-In both cases, `--cassandra-storage-dir` is the directory where all your data / SSTables are
+`--cassandra-storage-dir` is the directory where all your data / SSTables are
 for your Cassandra installation. This has to be specified as, normally, it would point to something like
 `/var/lib/cassandra/data` to have some example. This has to be specified explicitly.
+
+`--cassandra-storage-dir` and `--cassandra-yaml` are necessary only upon Cassandra 2 TTL removal.
 
 `--cassandra-yaml` is path to your `cassandra.yaml`, this has to be specified explicitly too.
 

@@ -6,11 +6,8 @@ import java.nio.file.Path;
 import java.util.Collection;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
-import org.apache.cassandra.config.Config;
-import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
 import org.apache.cassandra.db.ClusteringBound;
-import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.LivenessInfo;
 import org.apache.cassandra.db.RangeTombstone;
 import org.apache.cassandra.db.SerializationHeader;
@@ -26,16 +23,17 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.Row.Builder;
 import org.apache.cassandra.db.rows.Unfiltered;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
+import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.KeyIterator;
+import org.apache.cassandra.io.sstable.SSTable;
 import org.apache.cassandra.io.sstable.SSTableRewriter;
 import org.apache.cassandra.io.sstable.format.SSTableFormat;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.tools.Util;
+import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.utils.FBUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,65 +43,43 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
     private static final Logger logger = LoggerFactory.getLogger(Cassandra4TTLRemover.class);
 
     @Override
-    public void executeRemoval(final Path outputFolder, final Collection<Path> sstables) throws TTLRemovalException {
+    public void executeRemoval(final Path outputFolder, final Collection<Path> sstables, final String cql) throws Exception {
 
-        if (!DatabaseDescriptor.isToolInitialized()) {
-            DatabaseDescriptor.toolInitialization(false);
-        }
+        for (final Path sstable : sstables) {
+            final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
 
-        Util.initDatabaseDescriptor();
-        Config.setClientMode(true);
-        try {
-            Schema.instance.loadFromDisk(false);
-        } catch (final Exception ex) {
+            logger.info(format("Loading file %s from initial keyspace: %s", sstable, descriptor.ksname));
 
-        }
-        Keyspace.setInitialized();
+            final Path newSSTableDestinationDir = outputFolder.resolve(descriptor.ksname).resolve(descriptor.cfname);
 
-        try {
-            for (final Path sstable : sstables) {
-                final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
-
-                if (Schema.instance.getKeyspaceMetadata(descriptor.ksname) == null) {
-                    logger.warn(format("Filename %s references to nonexistent keyspace: %s!", sstable, descriptor.ksname));
-                    continue;
+            if (!newSSTableDestinationDir.toFile().exists()) {
+                if (!newSSTableDestinationDir.toFile().mkdirs()) {
+                    throw new TTLRemovalException(format("Unable to create directories leading to %s.", newSSTableDestinationDir.toFile().getAbsolutePath()));
                 }
-
-                logger.info(format("Loading file %s from initial keyspace: %s", sstable, descriptor.ksname));
-
-                final Path newSSTableDestinationDir = outputFolder.resolve(descriptor.ksname).resolve(descriptor.cfname);
-
-                if (!newSSTableDestinationDir.toFile().exists()) {
-                    if (!newSSTableDestinationDir.toFile().mkdirs()) {
-                        throw new TTLRemovalException(format("Unable to create directories leading to %s.", newSSTableDestinationDir.toFile().getAbsolutePath()));
-                    }
-                }
-
-                final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
-                                                             descriptor.ksname,
-                                                             descriptor.cfname,
-                                                             descriptor.generation,
-                                                             SSTableFormat.Type.BIG);
-                stream(descriptor, resultDesc);
             }
-        } catch (final Exception ex) {
-            throw new TTLRemovalException("Unable to remove TTL from SSTable-s.", ex);
+
+            final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
+                                                         descriptor.ksname,
+                                                         descriptor.cfname,
+                                                         descriptor.generation,
+                                                         SSTableFormat.Type.BIG);
+
+            final TableMetadata tableMetadata = CreateTableStatement.parse(cql, descriptor.ksname).partitioner(new Murmur3Partitioner()).build();
+
+            stream(descriptor, resultDesc, tableMetadata);
         }
     }
 
-    public void stream(final Descriptor descriptor, final Descriptor toSSTable) throws TTLRemovalException {
+    public void stream(final Descriptor descriptor, final Descriptor toSSTable, final TableMetadata tableMetadata) throws TTLRemovalException {
 
-        final SSTableReader noTTLreader;
+        final SSTableReader sourceSSTableReader;
 
         try {
-            noTTLreader = SSTableReader.open(descriptor);
+            sourceSSTableReader = SSTableReader.open(descriptor, SSTable.componentsFor(descriptor), TableMetadataRef.forOfflineTools(tableMetadata), true, true);
+            //sourceSSTableReader = SSTableReader.open(descriptor, TableMetadataRef.forOfflineTools(tableMetadata));
         } catch (final Exception ex) {
             throw new TTLRemovalException(format("Unable to open descriptor %s", descriptor.baseFilename()), ex);
         }
-
-        final ColumnFamilyStore columnFamily = ColumnFamilyStore.getIfExists(descriptor.ksname, descriptor.cfname);
-
-        final TableMetadata tableMetadata = columnFamily.metadata.get();
 
         final long keyCount = countKeys(descriptor, tableMetadata);
 
@@ -113,11 +89,11 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
 
         final SSTableRewriter writer = SSTableRewriter.constructKeepingOriginals(txn, true, Long.MAX_VALUE);
 
-        writer.switchWriter(SSTableWriter.create(toSSTable, keyCount, -1, null, false, header, null, txn));
+        writer.switchWriter(SSTableWriter.create(TableMetadataRef.forOfflineTools(tableMetadata), toSSTable, keyCount, -1, null, false, 0, header, null, txn));
 
-        try (final ISSTableScanner noTTLscanner = noTTLreader.getScanner()) {
-            while (noTTLscanner.hasNext()) {
-                final UnfilteredRowIterator partition = noTTLscanner.next();
+        try (final ISSTableScanner sourceSSTableScanner = sourceSSTableReader.getScanner()) {
+            while (sourceSSTableScanner.hasNext()) {
+                final UnfilteredRowIterator partition = sourceSSTableScanner.next();
 
                 if (!partition.hasNext()) {
                     //keep partitions with no rows
@@ -125,7 +101,7 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
                     continue;
                 }
 
-                final PartitionUpdate.Builder builder = new PartitionUpdate.Builder(columnFamily.metadata.get(),
+                final PartitionUpdate.Builder builder = new PartitionUpdate.Builder(tableMetadata,
                                                                                     partition.partitionKey(),
                                                                                     partition.columns(),
                                                                                     2,
@@ -160,7 +136,7 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
             }
             writer.finish();
         } catch (final Exception ex) {
-            throw new TTLRemovalException(format("Exception occured while scanning SSTable %s", descriptor.baseFilename()), ex);
+            throw new TTLRemovalException(format("Exception occurred while scanning SSTable %s", descriptor.baseFilename()), ex);
         }
     }
 

@@ -48,17 +48,31 @@ if [ -z "$CLASSPATH" ]; then
     exit 1
 fi
 
-CLASSPATH=$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-4/target/ttl-remover-cassandra-4.jar
-
 set +x
 
-java $JAVA_AGENT -cp "$CLASSPATH" $JVM_OPTS \
-    com.instaclustr.cassandra.ttl.cli.CLIApplication \
-    help \
-    sstable
-#    keyspace \
-#    --keyspace \
-#    /tmp/sstables/test \
+# For Cassandra 3 and 4
+
+# change versions of jars on classpath to target 3 or 4
+# change --cassandra-version if necessary
+java -javaagent:./buddy-agent/target/byte-buddy-agent.jar \
+    -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-3/target/ttl-remover-cassandra-3.jar" \
+    $JVM_OPTS \
+    com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI \
+    --cassandra-version=3 \
+    --sstables \
+    /tmp/original-3/test/test \
+    --output-path \
+    /tmp/stripped \
+    --cql \
+    'CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;'
+
+# For Cassandra 2
+
+#java -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-2/target/ttl-remover-cassandra-2.jar" $JVM_OPTS \
+#    com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI \
+#    --cassandra-version=2 \
+#    --sstables \
+#    /tmp/sstables2/test \
 #    --output-path \
 #    /tmp/stripped \
 #    --cassandra-yaml \

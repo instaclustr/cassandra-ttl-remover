@@ -10,22 +10,16 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
   
-  <artifactId>ttl-remover-impl</artifactId>
-  <version>1.1.0</version>
+  <artifactId>ttl-remover-byte-buddy</artifactId>
+  <version>1.0.0</version>
   
   <properties>
-    <slf4j.version>1.7.30</slf4j.version>
-    <picocli.version>4.5.1</picocli.version>
-    <version.cassandra.driver>3.0.1</version.cassandra.driver>
+    <version.cassandra>4.0-beta2</version.cassandra>
+    <version.bytebuddy>1.10.16</version.bytebuddy>
     
-    <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
-    <version.awaitility>3.1.6</version.awaitility>
-    <junit.version>4.12</junit.version>
-    
-    <cassandra.maven.plugin.version>1.0.1</cassandra.maven.plugin.version>
     <maven.jar.plugin.version>3.1.1</maven.jar.plugin.version>
-    <git.command.plugin.version>2.2.4</git.command.plugin.version>
     <maven.shade.plugin.version>3.2.1</maven.shade.plugin.version>
+    <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
     
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     
@@ -35,20 +29,22 @@
   
   <dependencies>
     <dependency>
-      <groupId>info.picocli</groupId>
-      <artifactId>picocli</artifactId>
-      <version>${picocli.version}</version>
+      <groupId>net.bytebuddy</groupId>
+      <artifactId>byte-buddy</artifactId>
+      <version>${version.bytebuddy}</version>
     </dependency>
     
     <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>${slf4j.version}</version>
+      <groupId>org.apache.cassandra</groupId>
+      <artifactId>cassandra-all</artifactId>
+      <version>${version.cassandra}</version>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
   
   <build>
-    <finalName>ttl-remover</finalName>
+    <finalName>byte-buddy-agent</finalName>
+    
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -61,25 +57,14 @@
               <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
             </manifest>
             <manifestEntries>
+              <Premain-Class>com.instaclustr.cassandra.ttl.buddy.CassandraAgent</Premain-Class>
+              <Implementation-URL>
+                https://github.com/instaclustr/TTLRemover/tree/${project.version}/buddy-agent
+              </Implementation-URL>
               <Git-Commit>${git.commit.id}</Git-Commit>
               <Build-Time>${git.build.time}</Build-Time>
             </manifestEntries>
           </archive>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>pl.project13.maven</groupId>
-        <artifactId>git-commit-id-plugin</artifactId>
-        <version>${git.command.plugin.version}</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>revision</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <dotGitDirectory>${project.basedir}/../.git</dotGitDirectory>
         </configuration>
       </plugin>
       <plugin>
@@ -88,16 +73,6 @@
         <version>${maven.shade.plugin.version}</version>
         <configuration>
           <minimizeJar>false</minimizeJar>
-          <createDependencyReducedPom>true</createDependencyReducedPom>
-          <dependencyReducedPomLocation>
-            ${java.io.tmpdir}/dependency-reduced-pom.xml
-          </dependencyReducedPomLocation>
-          <transformers>
-            <transformer
-              implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-              <mainClass>com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI</mainClass>
-            </transformer>
-          </transformers>
         </configuration>
         <executions>
           <execution>
