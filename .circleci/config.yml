@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
 
-    working_directory: ~/TTLRemover
+    working_directory: ~/cassandra-ttl-remover
 
     docker:
       - image: circleci/openjdk:8-jdk-stretch
