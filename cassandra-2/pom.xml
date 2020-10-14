@@ -19,7 +19,7 @@
     <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
     <version.generator>1.2</version.generator>
     <version.awaitility>4.0.3</version.awaitility>
-    <junit.version>4.12</junit.version>
+    <junit.version>4.13.1</junit.version>
     <version.cassandra.driver>3.0.1</version.cassandra.driver>
     
     <cassandra.maven.plugin.version>1.0.1</cassandra.maven.plugin.version>
