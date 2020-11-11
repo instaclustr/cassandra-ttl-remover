@@ -1,14 +1,17 @@
-# Cassandra TTL remover
+# Cassandra TTL Remover
+
+_Tool for rewriting SSTables to remove TTLs_
 
 image:https://img.shields.io/maven-central/v/com.instaclustr/ttl-remover-impl.svg?label=Maven%20Central[link=https://search.maven.org/search?q=g:%22com.instaclustr%22%20AND%20a:%22ttl-remover-impl%22]
 
 image:https://circleci.com/gh/instaclustr/cassandra-ttl-remover.svg?style=svg["Instaclustr",link="https://circleci.com/gh/instaclustr/cassandra-ttl-remover"]
 
-_Tool for rewriting SSTables to not contain TTLs_
+- Website: https://www.instaclustr.com/
+- Documentation: [https://www.instaclustr.com/support/documentation/)
 
-TTL remover removes TTL information for SSTables by rewriting them and creating new ones so it looks like data have never expired and they will never expire either.
-This is handy for testing scenarios and debugging purposes when we want to have data in Cassandra, visible, but the underlying SSTable expired them in the meanwhile.
-You can then loaded them back e.g. by `sstableloader` to Cassandra.
+TTL remover removes TTL information for SSTables by rewriting them and creating new ones, so it looks like data has never expired and they will never expire either.
+This is handy for testing scenarios and debugging purposes when we want to have data in Cassandra, visible, but the underlying SSTable has expired them in the meanwhile.
+You can then load them back e.g. by `sstableloader` to Cassandra.
 
 We are supporting:
 
@@ -18,33 +21,33 @@ We are supporting:
 
 ### Usage
 
-The user of this software might either grab the binaries in Maven Central or one may build it on his own.
+The user of this software might either grab the binaries in Maven Central, or they may build it on their own.
 
-The project is consisting of these modules:
+The project consists of these modules:
 
 * impl - the implementation of CLI plugin
 * cassandra-{2,3,4} - the implementation of TTL remover
 * buddy-agent - Byte Buddy agent used upon Cassandra 3 and 4 TTL removal
 
-Each remover for each respective Cassandra version removes TTLs from SSTables little bit differently.
-It is notoriously known that Cassandra is little bit hairy when it comes to re-usability in other projects
-so we are extending a modifying some Cassandra classes by copying them over and rewriting stuff which
+Each remover for each respective Cassandra version removes TTLs from SSTables a little bit differently.
+It is notoriously known that Cassandra is little bit hairy when it comes to re-usability in other projects,
+so we are extending the modifying of some Cassandra classes by copying them over and rewriting stuff which
 can not be out of the box (e.g. the case for Cassandra 2.2.x is particularly strong here).
 
 The `impl` module contains an interface `SSTableTTLRemover` which all Cassandra-specific modules
 implement. The SPI mechanism will load the concrete remover just because it was put on a class path.
 Hence, the mechanism to switch between Cassandra versions is to place the correct implementation
-JAR on the class path and `impl` module will do the rest.
+JAR on the class path and the `impl` module will do the rest.
 
-`buddy-agent` contains agent which is used upon execution for Cassandra 3 and 4 TTL removal. The purpose of this
-module is to mock some `DatabaseDescriptor` static methods. Normally, this class is initialized when a Cassandra process run
-but we are not running anything. The removal logic uses these methods, normally, we would have to have
-proper database schema in `$CASSANDRA_HOME/data` and logic which deals with reading and writing SSTables
-would also fetch data from system tables, for example. This is not desirable and by introducing this module,
-there is nothing necessary but `$CASSANDRA_HOME` with libs / jars so we can populate the classpath.
+`buddy-agent` contains an agent which is used upon execution for Cassandra 3 and 4 TTL removal. The purpose of this
+module is to mock some `DatabaseDescriptor` static methods. Normally, this class is initialized when a Cassandra process is run,
+but we are not running anything. The removal logic uses these methods—normally we would have to have
+proper database schema in `$CASSANDRA_HOME/data` and logic which deals with reading and writing SSTables, and for example
+would also fetch data from system tables. This is not desirable and by introducing this module
+the only thing necessary is `$CASSANDRA_HOME` with libs/jars so we can populate the classpath.
 
-The released artifacts do not ship Cassandra with it, you have to have `$CASSANDRA_HOME` set, pointing
-to your Cassandra installation for which you need to remove TTL information from SSTables for.
+The released artifacts do not ship Cassandra with it—you have to have `$CASSANDRA_HOME` set—pointing
+to your Cassandra installation from which you need to remove TTL information from SSTables.
 
 ### run.sh script
 
@@ -68,10 +71,10 @@ java -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-2/target/ttl-remov
     $CASSANDRA_HOME/data
 ----
 
-On the other hand, for Cassandra 3 / 4, the command would look like this. Notice we are using
-byte-buddy agent unlike for Cassandra 2 case and we are also specifying CQL statement as we
+On the other hand, for Cassandra 3/4, the command would look like this. Notice we are using
+byte-buddy agent, unlike for Cassandra 2 case, and we are also specifying CQL statement as we
 not have have access to `data` dir (it may be completely empty) but we need to construct metadata
-upon TTL removal, we do it programmatically.
+upon TTL removal, so we do it programmatically.
 
 ----
 java -javaagent:./buddy-agent/target/byte-buddy-agent.jar \
@@ -87,7 +90,7 @@ java -javaagent:./buddy-agent/target/byte-buddy-agent.jar \
     'CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;'
 ----
 
-All configuration options are as follows, you get this by `help` command, just after class specification:
+All configuration options are as follows—you get this by the `help` command just after class specification:
 
 ----
 Usage: ttl-remove [-hV] [-c=[INTEGER]] [-d=[DIRECTORY]] [-f=[FILE]] -p=
@@ -118,19 +121,19 @@ command for removing TTL from SSTables
 
 ----
 
-`--cassandra-storage-dir` is the directory where all your data / SSTables are
-for your Cassandra installation. This has to be specified as, normally, it would point to something like
-`/var/lib/cassandra/data` to have some example. This has to be specified explicitly.
+`--cassandra-storage-dir` is the directory where all your data/SSTables are
+for your Cassandra installation. This has to be specified; normally it would point to something like
+`/var/lib/cassandra/data` to give an example. This has to be specified explicitly.
 
-`--cassandra-storage-dir` and `--cassandra-yaml` are necessary only upon Cassandra 2 TTL removal.
+`--cassandra-storage-dir` and `--cassandra-yaml` are only necessary upon Cassandra 2 TTL removal.
 
-`--cassandra-yaml` is path to your `cassandra.yaml`, this has to be specified explicitly too.
+`--cassandra-yaml` is the path to your `cassandra.yaml`; this has to be specified explicitly too.
 
-Lastly, there has to be `--output-path` specified too - where your stripped SSTables from TTLs should be.
+Lastly, there has to be `--output-path` specified too—where your stripped SSTables from TTLs should be.
 
-### Load ttl-removed SSTable to a new cluster
+### Load TTL-Removed SSTable to a New Cluster
 
-1. Create the keyspace and table of the target sstable in the new cluster.
+1. Create the keyspace and table of the target SStable in the new cluster.
 
 2. In the source cluster, use the following command to load the ttl-removed SSTable into the new cluster.
 
@@ -145,8 +148,8 @@ $ mvn clean install
 Tests are skipped by `mvn clean install -DskipTests`.
 
 Please be sure that your $CASSANDRA_HOME **is not** set. Unit tests are starting an embedded Cassandra
-instance which is setting its own "Cassandra home" and having this set externally would confuse tests
-as it would react to different Cassandra home.
+instance which is setting its own "Cassandra home", and having this set externally would confuse tests
+as it would react to a different Cassandra home.
 
 ### Further Information
 
