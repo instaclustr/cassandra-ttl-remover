@@ -3,7 +3,6 @@
 _Tool for rewriting SSTables to remove TTLs_
 
 image:https://img.shields.io/maven-central/v/com.instaclustr/ttl-remover-impl.svg?label=Maven%20Central[link=https://search.maven.org/search?q=g:%22com.instaclustr%22%20AND%20a:%22ttl-remover-impl%22]
-
 image:https://circleci.com/gh/instaclustr/cassandra-ttl-remover.svg?style=svg["Instaclustr",link="https://circleci.com/gh/instaclustr/cassandra-ttl-remover"]
 
 - Website: https://www.instaclustr.com/
