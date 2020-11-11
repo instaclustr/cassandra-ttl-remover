@@ -52,7 +52,7 @@ public class Cassandra2TTLRemoverTest {
 
     private static final Logger logger = LoggerFactory.getLogger(Cassandra2TTLRemoverTest.class);
 
-    private static final String CASSANDRA_VERSION = System.getProperty("cassandra2.version", "2.2.18");
+    private static final String CASSANDRA_VERSION = System.getProperty("cassandra2.version", "2.2.19");
 
     private static final String KEYSPACE = "test";
 

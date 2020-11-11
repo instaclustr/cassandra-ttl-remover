@@ -2,6 +2,7 @@ package com.instaclustr.cassandra.ttl;
 
 import static java.lang.String.format;
 
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.Collection;
 
@@ -164,8 +165,8 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
 
         Builder builder = BTreeRow.unsortedBuilder();
 
-        for (final Cell cell : row.cells()) {
-            builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.value()));
+        for (final Cell<?> cell : row.cells()) {
+            builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer(), cell.path()));
         }
 
         builder.newRow(row.clustering());

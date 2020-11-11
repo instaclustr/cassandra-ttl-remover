@@ -52,7 +52,7 @@ public class Cassandra4TTLRemoverTest {
 
     private static final Logger logger = LoggerFactory.getLogger(Cassandra4TTLRemoverTest.class);
 
-    private static final String CASSANDRA_VERSION = System.getProperty("cassandra4.version", "4.0-beta2");
+    private static final String CASSANDRA_VERSION = System.getProperty("cassandra4.version", "4.0-beta3");
 
     private static final String KEYSPACE = "test";
 
