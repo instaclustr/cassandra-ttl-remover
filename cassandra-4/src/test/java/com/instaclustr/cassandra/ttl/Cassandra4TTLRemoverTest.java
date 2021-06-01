@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -20,10 +21,10 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
-import com.github.nosan.embedded.cassandra.EmbeddedCassandraFactory;
-import com.github.nosan.embedded.cassandra.api.Cassandra;
-import com.github.nosan.embedded.cassandra.api.Version;
-import com.github.nosan.embedded.cassandra.artifact.Artifact;
+import com.github.nosan.embedded.cassandra.Cassandra;
+import com.github.nosan.embedded.cassandra.CassandraBuilder;
+import com.github.nosan.embedded.cassandra.Version;
+import com.github.nosan.embedded.cassandra.WorkingDirectoryDestroyer;
 import com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI;
 import com.instaclustr.sstable.generator.BulkLoader;
 import com.instaclustr.sstable.generator.CassandraBulkLoader;
@@ -52,13 +53,11 @@ public class Cassandra4TTLRemoverTest {
 
     private static final Logger logger = LoggerFactory.getLogger(Cassandra4TTLRemoverTest.class);
 
-    private static final String CASSANDRA_VERSION = System.getProperty("cassandra4.version", "4.0-beta3");
+    private static final String CASSANDRA_VERSION = System.getProperty("cassandra4.version", "4.0-rc1");
+    private static final Path cassandraDir = new File("target/cassandra-4").toPath().toAbsolutePath();
 
     private static final String KEYSPACE = "test";
-
     private static final String TABLE = "test";
-
-    private static Artifact CASSANDRA_ARTIFACT = Artifact.ofVersion(Version.of(CASSANDRA_VERSION));
 
     @Rule
     public TemporaryFolder noTTLSSTables = new TemporaryFolder();
@@ -66,23 +65,17 @@ public class Cassandra4TTLRemoverTest {
     @Rule
     public TemporaryFolder generatedSSTables = new TemporaryFolder();
 
+
     @Test
     public void removeTTL() throws InterruptedException {
 
-        System.out.println(System.getProperty("java.library.path"));
+        logger.info(System.getProperty("java.library.path"));
 
         Path cassandraDir = new File("target/cassandra-4").toPath().toAbsolutePath();
 
-        EmbeddedCassandraFactory cassandraFactory = new EmbeddedCassandraFactory();
-        cassandraFactory.setWorkingDirectory(cassandraDir);
-        cassandraFactory.setArtifact(CASSANDRA_ARTIFACT);
-        cassandraFactory.getJvmOptions().add("-Xmx1g");
-        cassandraFactory.getJvmOptions().add("-Xms1g");
-
-        Cassandra cassandra = null;
+        Cassandra cassandra = getCassandra();
 
         try {
-            cassandra = cassandraFactory.create();
             cassandra.start();
 
             waitForCql();
@@ -94,7 +87,7 @@ public class Cassandra4TTLRemoverTest {
 
             // this has to be here for streaming in loader ... yeah, just here
             System.setProperty("cassandra.storagedir", cassandraDir.resolve("data").toAbsolutePath().toString());
-            System.setProperty("cassandra.config", "file://" + findCassandraYaml(new File("target/cassandra-4/conf").toPath()).toAbsolutePath().toString());
+            System.setProperty("cassandra.config", "file://" + findCassandraYaml(cassandraDir.resolve("conf")).toAbsolutePath().toString());
             DatabaseDescriptor.toolInitialization(false);
 
             final BulkLoaderSpec bulkLoaderSpec = new BulkLoaderSpec();
@@ -119,18 +112,6 @@ public class Cassandra4TTLRemoverTest {
             // wait until data would expire
             Thread.sleep(15000);
 
-            //
-            // load data and see that we do not have them there as they expired
-
-            final CassandraBulkLoaderSpec cassandraBulkLoaderSpec = new CassandraBulkLoaderSpec();
-            cassandraBulkLoaderSpec.node = "127.0.0.1";
-            cassandraBulkLoaderSpec.cassandraYaml = findCassandraYaml(new File("target/cassandra-4/conf").toPath());
-            cassandraBulkLoaderSpec.sstablesDir = bulkLoaderSpec.outputDir;
-            cassandraBulkLoaderSpec.cassandraVersion = CassandraVersion.V3;
-
-            final CassandraBulkLoader cassandraBulkLoader = new Cassandra4CustomBulkLoader();
-            cassandraBulkLoader.cassandraBulkLoaderSpec = cassandraBulkLoaderSpec;
-
             // here we see they expired
 
             try (final Cluster cluster = Cluster.builder().addContactPoint("127.0.0.1").withPort(9042).build(); final Session session = cluster.connect()) {
@@ -144,18 +125,17 @@ public class Cassandra4TTLRemoverTest {
             // remove ttls
 
             TTLRemoverCLI.main(new String[]{
-                "--cassandra-version=4",
-                "--sstables",
-                bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
-                "--output-path",
-                noTTLSSTables.getRoot().toPath().toString(),
-                "--cql",
-                "CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;"
+                    "--cassandra-version=4",
+                    "--sstables",
+                    bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
+                    "--output-path",
+                    noTTLSSTables.getRoot().toPath().toString(),
+                    "--cql",
+                    "CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;"
             }, false);
 
             // start new Cassandra instance
 
-            cassandra = cassandraFactory.create();
             cassandra.start();
 
             executeWithSession(session -> {
@@ -163,15 +143,12 @@ public class Cassandra4TTLRemoverTest {
                 session.execute(String.format("CREATE TABLE IF NOT EXISTS %s.%s (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;", KEYSPACE, TABLE));
             });
 
-            // import it into Cassandra
-
             final CassandraBulkLoader cassandraBulkLoader2 = new Cassandra4CustomBulkLoader();
-            cassandraBulkLoader2.cassandraBulkLoaderSpec = cassandraBulkLoaderSpec;
 
             final CassandraBulkLoaderSpec cassandraBulkLoaderSpec2 = new CassandraBulkLoaderSpec();
 
             cassandraBulkLoaderSpec2.node = "127.0.0.1";
-            cassandraBulkLoaderSpec2.cassandraYaml = findCassandraYaml(new File("target/cassandra-4/conf").toPath());
+            cassandraBulkLoaderSpec2.cassandraYaml = findCassandraYaml(cassandraDir.resolve("conf"));
             cassandraBulkLoaderSpec2.sstablesDir = Paths.get(noTTLSSTables.getRoot().getAbsolutePath(), KEYSPACE, TABLE);
             cassandraBulkLoaderSpec2.cassandraVersion = CassandraVersion.V4;
             cassandraBulkLoaderSpec2.keyspace = KEYSPACE;
@@ -194,6 +171,24 @@ public class Cassandra4TTLRemoverTest {
         }
     }
 
+    private static Cassandra getCassandra() {
+        CassandraBuilder builder = new CassandraBuilder();
+
+        builder.version(Version.parse(CASSANDRA_VERSION));
+        builder.jvmOptions("-Xmx1g");
+        builder.jvmOptions("-Xms1g");
+        builder.workingDirectory(() -> cassandraDir);
+        builder.addConfigProperties(new HashMap<String, String>() {{
+            put("enable_sasi_indexes", "true");
+            put("enable_user_defined_functions", "true");
+        }});
+
+        builder.workingDirectoryDestroyer(WorkingDirectoryDestroyer.deleteOnly("data"));
+
+        return builder.build();
+    }
+
+
     public static final class TestFixedImplementation implements RowMapper {
 
         public static final String KEYSPACE = "test";
@@ -211,21 +206,21 @@ public class Cassandra4TTLRemoverTest {
         @Override
         public Stream<List<Object>> get() {
             return Stream.of(
-                new ArrayList<Object>() {{
-                    add(UUID_1);
-                    add("John");
-                    add("Doe");
-                }},
-                new ArrayList<Object>() {{
-                    add(UUID_2);
-                    add("Marry");
-                    add("Poppins");
-                }},
-                new ArrayList<Object>() {{
-                    add(UUID_3);
-                    add("Jim");
-                    add("Jack");
-                }});
+                    new ArrayList<Object>() {{
+                        add(UUID_1);
+                        add("John");
+                        add("Doe");
+                    }},
+                    new ArrayList<Object>() {{
+                        add(UUID_2);
+                        add("Marry");
+                        add("Poppins");
+                    }},
+                    new ArrayList<Object>() {{
+                        add(UUID_3);
+                        add("Jim");
+                        add("Jack");
+                    }});
         }
 
         @Override
@@ -242,17 +237,17 @@ public class Cassandra4TTLRemoverTest {
 
     private void waitForCql() {
         await()
-            .pollInterval(10, TimeUnit.SECONDS)
-            .pollInSameThread()
-            .timeout(1, TimeUnit.MINUTES)
-            .until(() -> {
-                try (final Cluster cluster = Cluster.builder().addContactPoint("127.0.0.1").build()) {
-                    cluster.connect();
-                    return true;
-                } catch (final Exception ex) {
-                    return false;
-                }
-            });
+                .pollInterval(10, TimeUnit.SECONDS)
+                .pollInSameThread()
+                .timeout(1, TimeUnit.MINUTES)
+                .until(() -> {
+                    try (final Cluster cluster = Cluster.builder().addContactPoint("127.0.0.1").build()) {
+                        cluster.connect();
+                        return true;
+                    } catch (final Exception ex) {
+                        return false;
+                    }
+                });
     }
 
     public void executeWithSession(Consumer<Session> supplier) {
@@ -267,19 +262,19 @@ public class Cassandra4TTLRemoverTest {
 
         try {
             return Files.list(confDir)
-                .filter(path -> path.getFileName().toString().contains("-cassandra.yaml"))
-                .findFirst()
-                .orElseThrow(RuntimeException::new);
+                        .filter(path -> path.getFileName().toString().contains("-cassandra.yaml"))
+                        .findFirst()
+                        .orElseThrow(RuntimeException::new);
         } catch (final Exception e) {
             throw new IllegalStateException("Unable to list or there is not any file ending on -cassandra.yaml" + confDir);
         }
     }
 
     @Command(name = "fixed",
-        mixinStandardHelpOptions = true,
-        description = "tool for bulk-loading of fixed data",
-        sortOptions = false,
-        versionProvider = CLIApplication.class)
+             mixinStandardHelpOptions = true,
+             description = "tool for bulk-loading of fixed data",
+             sortOptions = false,
+             versionProvider = CLIApplication.class)
     public static final class TestBulkLoader extends BulkLoader {
 
         @Override

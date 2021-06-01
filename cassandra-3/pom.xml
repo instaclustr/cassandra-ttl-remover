@@ -6,17 +6,17 @@
   <parent>
     <groupId>com.instaclustr</groupId>
     <artifactId>ttl-remover-parent</artifactId>
-    <version>1.1.1</version>
+    <version>1.1.2</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   
-  <artifactId>ttl-remover-cassandra-3</artifactId>
-  <version>1.1.1</version>
+  <artifactId>ttl-remover-cassandra-3-11-10</artifactId>
+  <version>1.0</version>
   
   <properties>
-    <version.cassandra>3.11.9</version.cassandra>
+    <version.cassandra>3.11.10</version.cassandra>
     <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
-    <version.generator>1.3</version.generator>
+    <version.generator>1.4</version.generator>
     <version.awaitility>4.0.3</version.awaitility>
     <junit.version>4.13.1</junit.version>
     <version.cassandra.driver>3.0.1</version.cassandra.driver>
@@ -36,7 +36,7 @@
     <dependency>
       <groupId>com.instaclustr</groupId>
       <artifactId>ttl-remover-impl</artifactId>
-      <version>${project.version}</version>
+      <version>1.1.2</version>
       <scope>provided</scope>
     </dependency>
     
@@ -56,8 +56,8 @@
     
     <dependency>
       <groupId>com.instaclustr</groupId>
-      <artifactId>sstable-generator-cassandra-3</artifactId>
-      <version>${version.generator}</version>
+      <artifactId>sstable-generator-cassandra-3-11-10</artifactId>
+      <version>1.0</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>
