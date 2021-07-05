@@ -10,11 +10,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>ttl-remover-cassandra-4-0-rc1</artifactId>
+    <artifactId>ttl-remover-cassandra-4-0-rc2</artifactId>
     <version>1.0</version>
 
     <properties>
-        <version.cassandra>4.0-rc1</version.cassandra>
+        <version.cassandra>4.0-rc2</version.cassandra>
 
         <version.embedded.cassandra>4.0.1</version.embedded.cassandra>
         <version.generator>1.4</version.generator>

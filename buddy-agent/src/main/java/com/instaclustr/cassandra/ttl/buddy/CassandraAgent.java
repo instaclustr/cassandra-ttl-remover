@@ -110,8 +110,20 @@ public class CassandraAgent {
         agentBuilder
             .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
             .transform((builder, typeDescription, classLoader, javaModule) ->
-                           builder.method(ElementMatchers.named("getAllDataFileLocations")).intercept(FixedValue.value(new String[]{})))
+                           builder.method(ElementMatchers.named("getLocalSystemKeyspacesDataFileLocations")).intercept(FixedValue.value(new String[]{})))
             .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                        builder.method(ElementMatchers.named("getNonLocalSystemKeyspacesDataFileLocations")).intercept(FixedValue.value(FixedValue.value(new String[]{}))))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                        builder.method(ElementMatchers.named("getAllDataFileLocations")).intercept(FixedValue.value(new String[]{})))
+                .installOn(inst);
 
         agentBuilder
             .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
@@ -124,5 +136,17 @@ public class CassandraAgent {
             .transform((builder, typeDescription, classLoader, javaModule) ->
                            builder.method(ElementMatchers.named("getDiskOptimizationStrategy")).intercept(FixedValue.value(new SpinningDiskOptimizationStrategy())))
             .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                        builder.method(ElementMatchers.named("getNetworkingCacheSizeInMB")).intercept(FixedValue.value(0)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                        builder.method(ElementMatchers.named("getFileCacheEnabled")).intercept(FixedValue.value(false)))
+                .installOn(inst);
     }
 }

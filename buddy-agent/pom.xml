@@ -11,10 +11,10 @@
   </parent>
   
   <artifactId>ttl-remover-byte-buddy</artifactId>
-  <version>1.0.2</version>
+  <version>1.0.3</version>
   
   <properties>
-    <version.cassandra>4.0-rc1</version.cassandra>
+    <version.cassandra>4.0-rc2</version.cassandra>
     <version.bytebuddy>1.10.16</version.bytebuddy>
     
     <maven.jar.plugin.version>3.1.1</maven.jar.plugin.version>
