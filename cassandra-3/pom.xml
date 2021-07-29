@@ -10,11 +10,11 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
   
-  <artifactId>ttl-remover-cassandra-3-11-10</artifactId>
+  <artifactId>ttl-remover-cassandra-3-11-11</artifactId>
   <version>1.0</version>
   
   <properties>
-    <version.cassandra>3.11.10</version.cassandra>
+    <version.cassandra>3.11.11</version.cassandra>
     <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
     <version.generator>1.4</version.generator>
     <version.awaitility>4.0.3</version.awaitility>
@@ -56,7 +56,7 @@
     
     <dependency>
       <groupId>com.instaclustr</groupId>
-      <artifactId>sstable-generator-cassandra-3-11-10</artifactId>
+      <artifactId>sstable-generator-cassandra-3-11-11</artifactId>
       <version>1.0</version>
       <scope>test</scope>
       <exclusions>
