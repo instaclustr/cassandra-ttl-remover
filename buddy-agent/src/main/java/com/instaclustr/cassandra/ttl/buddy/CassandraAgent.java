@@ -19,6 +19,42 @@ public class CassandraAgent {
         agentBuilder
                 .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
                 .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getMinRpcTimeout")).intercept(FixedValue.value(5000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getTruncateRpcTimeout")).intercept(FixedValue.value(60000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getCounterWriteRpcTimeout")).intercept(FixedValue.value(5000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getWriteRpcTimeout")).intercept(FixedValue.value(2000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getRangeRpcTimeout")).intercept(FixedValue.value(10000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getReadRpcTimeout")).intercept(FixedValue.value(5000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
                                    builder.method(ElementMatchers.named("getRpcTimeout")).intercept(FixedValue.value(5000)))
                 .installOn(inst);
 
