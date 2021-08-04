@@ -17,6 +17,12 @@ public class CassandraAgent {
         final Default agentBuilder = new Default();
 
         agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getConcurrentCounterWriters")).intercept(FixedValue.value(32)))
+                .installOn(inst);
+
+        agentBuilder
             .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
             .transform((builder, typeDescription, classLoader, javaModule) ->
                            builder.method(ElementMatchers.named("getBufferPoolUseHeapIfExhausted")).intercept(FixedValue.value(true)))
