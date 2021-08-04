@@ -19,6 +19,12 @@ public class CassandraAgent {
         agentBuilder
                 .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
                 .transform((builder, typeDescription, classLoader, javaModule) ->
+                                   builder.method(ElementMatchers.named("getRpcTimeout")).intercept(FixedValue.value(5000)))
+                .installOn(inst);
+
+        agentBuilder
+                .type(ElementMatchers.named("org.apache.cassandra.config.DatabaseDescriptor"))
+                .transform((builder, typeDescription, classLoader, javaModule) ->
                                    builder.method(ElementMatchers.named("getConcurrentCounterWriters")).intercept(FixedValue.value(32)))
                 .installOn(inst);
 
