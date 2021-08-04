@@ -15,8 +15,8 @@ You can then load them back e.g. by `sstableloader` to Cassandra.
 We are supporting:
 
 * Cassandra 2 line (2.2.18)
-* Cassandra 3 line (3.11.8)
-* Cassandra 4 line (4.0-beta2)
+* Cassandra 3 line (3.11.11)
+* Cassandra 4 line (4.0.0)
 
 ### Usage
 
