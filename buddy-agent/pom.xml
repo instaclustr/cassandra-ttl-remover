@@ -11,7 +11,7 @@
   </parent>
   
   <artifactId>ttl-remover-byte-buddy</artifactId>
-  <version>1.0.3</version>
+  <version>1.0.4</version>
   
   <properties>
     <version.cassandra>4.0.0</version.cassandra>
