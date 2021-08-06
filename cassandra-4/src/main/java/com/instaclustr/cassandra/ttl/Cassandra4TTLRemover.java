@@ -5,6 +5,7 @@ import static java.lang.String.format;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Iterator;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
 import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
@@ -16,14 +17,8 @@ import org.apache.cassandra.db.Slice;
 import org.apache.cassandra.db.compaction.OperationType;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
-import org.apache.cassandra.db.rows.BTreeRow;
-import org.apache.cassandra.db.rows.BufferCell;
-import org.apache.cassandra.db.rows.Cell;
-import org.apache.cassandra.db.rows.RangeTombstoneBoundMarker;
-import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.db.rows.Row.Builder;
-import org.apache.cassandra.db.rows.Unfiltered;
-import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
@@ -33,6 +28,7 @@ import org.apache.cassandra.io.sstable.SSTableRewriter;
 import org.apache.cassandra.io.sstable.format.SSTableFormat;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
+import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.utils.FBUtilities;
@@ -165,14 +161,28 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
 
         Builder builder = BTreeRow.unsortedBuilder();
 
-        for (final Cell<?> cell : row.cells()) {
-            builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer(), cell.path()));
-        }
-
         builder.newRow(row.clustering());
         builder.addPrimaryKeyLivenessInfo(LivenessInfo.create(row.primaryKeyLivenessInfo().timestamp(),
                                                               LivenessInfo.NO_TTL,
                                                               FBUtilities.nowInSeconds()));
+
+        row.columnData().forEach(cd -> {
+            if (cd.column().isComplex()) {
+
+                ColumnMetadata cdef = cd.column();
+                ComplexColumnData ccd = row.getComplexColumnData(cdef);
+
+                Iterator<Cell<?>> cellIterator = ccd.iterator();
+
+                while (cellIterator.hasNext()) {
+                    Cell cell = cellIterator.next();
+                    builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer(), cell.path()));
+                }
+            } else {
+                Cell cell = row.getCell(cd.column());
+                builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer()));
+            }
+        });
         builder.addRowDeletion(row.deletion());
 
         return builder.build();
