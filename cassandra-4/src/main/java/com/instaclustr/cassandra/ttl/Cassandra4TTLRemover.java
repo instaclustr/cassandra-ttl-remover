@@ -4,7 +4,9 @@ import static java.lang.String.format;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
 import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
@@ -16,14 +18,8 @@ import org.apache.cassandra.db.Slice;
 import org.apache.cassandra.db.compaction.OperationType;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
-import org.apache.cassandra.db.rows.BTreeRow;
-import org.apache.cassandra.db.rows.BufferCell;
-import org.apache.cassandra.db.rows.Cell;
-import org.apache.cassandra.db.rows.RangeTombstoneBoundMarker;
-import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.db.rows.Row.Builder;
-import org.apache.cassandra.db.rows.Unfiltered;
-import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
@@ -33,6 +29,7 @@ import org.apache.cassandra.io.sstable.SSTableRewriter;
 import org.apache.cassandra.io.sstable.format.SSTableFormat;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
+import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.utils.FBUtilities;
@@ -73,11 +70,10 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
 
     public void stream(final Descriptor descriptor, final Descriptor toSSTable, final TableMetadata tableMetadata) throws TTLRemovalException {
 
-        final SSTableReader sourceSSTableReader;
+        final SSTableReader noTTLreader;
 
         try {
-            sourceSSTableReader = SSTableReader.open(descriptor, SSTable.componentsFor(descriptor), TableMetadataRef.forOfflineTools(tableMetadata), true, true);
-            //sourceSSTableReader = SSTableReader.open(descriptor, TableMetadataRef.forOfflineTools(tableMetadata));
+            noTTLreader = SSTableReader.open(descriptor, SSTable.componentsFor(descriptor), TableMetadataRef.forOfflineTools(tableMetadata), true, true);
         } catch (final Exception ex) {
             throw new TTLRemovalException(format("Unable to open descriptor %s", descriptor.baseFilename()), ex);
         }
@@ -86,13 +82,13 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
 
         final LifecycleTransaction txn = LifecycleTransaction.offline(OperationType.WRITE);
 
-        final SerializationHeader header = SerializationHeader.makeWithoutStats(tableMetadata);
+        final SerializationHeader header = SerializationHeader.make(tableMetadata, Arrays.asList(noTTLreader));
 
         final SSTableRewriter writer = SSTableRewriter.constructKeepingOriginals(txn, true, Long.MAX_VALUE);
 
         writer.switchWriter(SSTableWriter.create(TableMetadataRef.forOfflineTools(tableMetadata), toSSTable, keyCount, -1, null, false, 0, header, null, txn));
 
-        try (final ISSTableScanner sourceSSTableScanner = sourceSSTableReader.getScanner()) {
+        try (final ISSTableScanner sourceSSTableScanner = noTTLreader.getScanner()) {
             while (sourceSSTableScanner.hasNext()) {
                 final UnfilteredRowIterator partition = sourceSSTableScanner.next();
 
@@ -163,16 +159,27 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
 
         final Row row = (Row) atoms;
 
-        Builder builder = BTreeRow.unsortedBuilder();
-
-        for (final Cell<?> cell : row.cells()) {
-            builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer(), cell.path()));
-        }
+        Builder builder = BTreeRow.sortedBuilder();
 
         builder.newRow(row.clustering());
         builder.addPrimaryKeyLivenessInfo(LivenessInfo.create(row.primaryKeyLivenessInfo().timestamp(),
                                                               LivenessInfo.NO_TTL,
                                                               FBUtilities.nowInSeconds()));
+
+        row.columnData().forEach(cd -> {
+            ColumnMetadata columnMetadata = cd.column();
+            if (columnMetadata.isComplex()) {
+                Iterator<Cell<?>> cellIterator = row.getComplexColumnData(columnMetadata).iterator();
+
+                while (cellIterator.hasNext()) {
+                    Cell<?> cell = cellIterator.next();
+                    builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer(), cell.path()));
+                }
+            } else {
+                Cell<?> cell = row.getCell(columnMetadata);
+                builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.buffer()));
+            }
+        });
         builder.addRowDeletion(row.deletion());
 
         return builder.build();

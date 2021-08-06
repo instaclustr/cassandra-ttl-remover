@@ -3,30 +3,23 @@ package com.instaclustr.cassandra.ttl;
 import static java.lang.String.format;
 
 import java.nio.file.Path;
-import java.util.Collection;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
 import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.statements.CFStatement;
 import org.apache.cassandra.cql3.statements.CreateTableStatement;
-import org.apache.cassandra.db.ClusteringBound;
-import org.apache.cassandra.db.LivenessInfo;
-import org.apache.cassandra.db.RangeTombstone;
-import org.apache.cassandra.db.SerializationHeader;
-import org.apache.cassandra.db.Slice;
+import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.compaction.OperationType;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
+import org.apache.cassandra.db.marshal.CollectionType;
+import org.apache.cassandra.db.marshal.MapType;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
-import org.apache.cassandra.db.rows.BTreeRow;
-import org.apache.cassandra.db.rows.BufferCell;
-import org.apache.cassandra.db.rows.Cell;
-import org.apache.cassandra.db.rows.RangeTombstoneBoundMarker;
-import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.db.rows.Row.Builder;
-import org.apache.cassandra.db.rows.Unfiltered;
-import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
@@ -99,7 +92,7 @@ public class Cassandra3TTLRemover implements SSTableTTLRemover {
 
         final LifecycleTransaction txn = LifecycleTransaction.offline(OperationType.WRITE);
 
-        final SerializationHeader header = SerializationHeader.makeWithoutStats(cfMetadata);
+        final SerializationHeader header = SerializationHeader.make(cfMetadata, Arrays.asList(noTTLreader));
 
         final SSTableRewriter writer = SSTableRewriter.constructKeepingOriginals(txn, true, Long.MAX_VALUE);
 
@@ -144,6 +137,7 @@ public class Cassandra3TTLRemover implements SSTableTTLRemover {
                     }
                 }
 
+                update.allowNewUpdates();
                 writer.append(update.unfilteredIterator());
             }
             writer.finish();
@@ -174,16 +168,28 @@ public class Cassandra3TTLRemover implements SSTableTTLRemover {
 
         final Row row = (Row) atoms;
 
-        Builder builder = BTreeRow.unsortedBuilder((int) (System.currentTimeMillis() / 1000));
-
-        for (final Cell cell : row.cells()) {
-            builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.value()));
-        }
-
+        Builder builder = BTreeRow.sortedBuilder();
         builder.newRow(row.clustering());
+
         builder.addPrimaryKeyLivenessInfo(LivenessInfo.create(row.primaryKeyLivenessInfo().timestamp(),
                                                               LivenessInfo.NO_TTL,
                                                               FBUtilities.nowInSeconds()));
+
+        row.columnData().forEach(cd -> {
+            ColumnDefinition cdef = cd.column();
+            if (cdef.isComplex()) {
+                Iterator<Cell> cellIterator = row.getComplexColumnData(cdef).iterator();
+
+                while (cellIterator.hasNext()) {
+                    Cell cell = cellIterator.next();
+                    builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.value(), cell.path()));
+                }
+            } else {
+                Cell cell = row.getCell(cdef);
+                builder.addCell(BufferCell.live(cell.column(), cell.timestamp(), cell.value()));
+            }
+        });
+
         builder.addRowDeletion(row.deletion());
 
         return builder.build();
