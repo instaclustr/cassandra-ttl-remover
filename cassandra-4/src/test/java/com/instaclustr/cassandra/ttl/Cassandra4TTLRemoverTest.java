@@ -53,7 +53,7 @@ public class Cassandra4TTLRemoverTest {
 
     private static final Logger logger = LoggerFactory.getLogger(Cassandra4TTLRemoverTest.class);
 
-    private static final String CASSANDRA_VERSION = System.getProperty("cassandra4.version", "4.0.0");
+    private static final String CASSANDRA_VERSION = System.getProperty("version.cassandra4", "4.0.7");
     private static final Path cassandraDir = new File("target/cassandra-4").toPath().toAbsolutePath();
 
     private static final String KEYSPACE = "test";
@@ -87,7 +87,7 @@ public class Cassandra4TTLRemoverTest {
 
             // this has to be here for streaming in loader ... yeah, just here
             System.setProperty("cassandra.storagedir", cassandraDir.resolve("data").toAbsolutePath().toString());
-            System.setProperty("cassandra.config", "file://" + findCassandraYaml(cassandraDir.resolve("conf")).toAbsolutePath().toString());
+            System.setProperty("cassandra.config", "file://" + findCassandraYaml(cassandraDir.resolve("conf")).toAbsolutePath());
             DatabaseDescriptor.toolInitialization(false);
 
             final BulkLoaderSpec bulkLoaderSpec = new BulkLoaderSpec();
@@ -127,7 +127,7 @@ public class Cassandra4TTLRemoverTest {
             TTLRemoverCLI.main(new String[]{
                     "--cassandra-version=4",
                     "--sstables",
-                    bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
+                    bulkLoaderSpec.outputDir.toAbsolutePath() + "/test",
                     "--output-path",
                     noTTLSSTables.getRoot().toPath().toString(),
                     "--cql",

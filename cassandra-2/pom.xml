@@ -14,10 +14,10 @@
   <version>1.0</version>
   
   <properties>
-    <version.cassandra>2.2.19</version.cassandra>
+    <version.cassandra2>2.2.19</version.cassandra2>
     
     <version.embedded.cassandra>3.0.2</version.embedded.cassandra>
-    <version.generator>1.4</version.generator>
+    <version.generator>1.5</version.generator>
     <version.awaitility>4.0.3</version.awaitility>
     <junit.version>4.13.1</junit.version>
     <version.cassandra.driver>3.0.1</version.cassandra.driver>
@@ -46,7 +46,7 @@
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-all</artifactId>
-      <version>${version.cassandra}</version>
+      <version>${version.cassandra2}</version>
       <scope>provided</scope>
     </dependency>
     

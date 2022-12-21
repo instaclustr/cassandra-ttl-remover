@@ -50,21 +50,35 @@ fi
 
 set +x
 
-# For Cassandra 3 and 4
+# For Cassandra 4.1
 
-# change versions of jars on classpath to target 3 or 4
-# change --cassandra-version if necessary
-java -javaagent:./buddy-agent/target/byte-buddy-agent.jar \
-    -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-3/target/ttl-remover-cassandra-3.jar" \
+java -Dcassandra.storagedir=$CASSANDRA_HOME/data -Dcassandra.config=file:///$CASSANDRA_HOME/conf/cassandra.yaml \
+    -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-4.1/target/ttl-remover-cassandra-4.1.jar" \
     $JVM_OPTS \
     com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI \
-    --cassandra-version=3 \
+    --cassandra-version=4 \
     --sstables \
-    /tmp/original-3/test/test \
+    /tmp/original-4/test/test \
     --output-path \
     /tmp/stripped \
     --cql \
     'CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;'
+
+# For Cassandra 3 and 4.0
+
+# change versions of jars on classpath to target 3 or 4
+# change --cassandra-version if necessary
+#java -javaagent:./buddy-agent/target/byte-buddy-agent.jar \
+#    -cp "$CLASSPATH./impl/target/ttl-remover.jar:./cassandra-3/target/ttl-remover-cassandra-3.jar" \
+#    $JVM_OPTS \
+#    com.instaclustr.cassandra.ttl.cli.TTLRemoverCLI \
+#    --cassandra-version=3 \
+#    --sstables \
+#    /tmp/original-3/test/test \
+#    --output-path \
+#    /tmp/stripped \
+#    --cql \
+#    'CREATE TABLE IF NOT EXISTS test.test (id uuid, name text, surname text, PRIMARY KEY (id)) WITH default_time_to_live = 10;'
 
 # For Cassandra 2
 

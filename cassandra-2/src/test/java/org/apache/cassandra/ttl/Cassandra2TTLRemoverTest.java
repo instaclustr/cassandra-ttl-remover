@@ -52,13 +52,13 @@ public class Cassandra2TTLRemoverTest {
 
     private static final Logger logger = LoggerFactory.getLogger(Cassandra2TTLRemoverTest.class);
 
-    private static final String CASSANDRA_VERSION = System.getProperty("cassandra2.version", "2.2.19");
+    private static final String CASSANDRA_VERSION = System.getProperty("version.cassandra2", "2.2.19");
 
     private static final String KEYSPACE = "test";
 
     private static final String TABLE = "test";
 
-    private static Artifact CASSANDRA_ARTIFACT = Artifact.ofVersion(Version.of(CASSANDRA_VERSION));
+    private static final Artifact CASSANDRA_ARTIFACT = Artifact.ofVersion(Version.of(CASSANDRA_VERSION));
 
     @Rule
     public TemporaryFolder noTTLSSTables = new TemporaryFolder();
@@ -164,7 +164,7 @@ public class Cassandra2TTLRemoverTest {
             TTLRemoverCLI.main(new String[]{
                 "--cassandra-version=2",
                 "--sstables",
-                bulkLoaderSpec.outputDir.toAbsolutePath().toString() + "/test",
+                bulkLoaderSpec.outputDir.toAbsolutePath() + "/test",
                 "--output-path",
                 noTTLSSTables.getRoot().toPath().toString(),
                 "--cassandra-yaml",

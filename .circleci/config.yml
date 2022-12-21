@@ -5,13 +5,27 @@ jobs:
     working_directory: ~/cassandra-ttl-remover
 
     docker:
-      - image: circleci/openjdk:8-jdk-stretch
+      - image: cimg/openjdk:8.0
 
     steps:
 
       - checkout
 
-      - run: mvn install -Dcassandra2.version=2.2.19 -Dcassandra3.version=3.11.11 -Dcassandra4.version=4.0.0
+      - restore_cache:
+          keys:
+            - m2-{{ checksum "pom.xml" }}
 
-      - store_test_results:
-          path: target/surefire-reports
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: m2-{{ checksum "pom.xml" }}
+
+      - run: mvn install -Dversion.cassandra2=2.2.19 -Dversion.cassandra3=3.11.14 -Dversion.cassandra4=4.0.7 -Dversion.cassandra41=4.1.0
+
+      - persist_to_workspace:
+          root: ~/cassandra-ttl-remover
+          paths:
+            - "cassandra-2/target/cassandra-ldap-2.jar"
+            - "cassandra-3/target/cassandra-ldap-3.jar"
+            - "cassandra-4/target/ttl-remover-cassandra-4.jar"
+            - "cassandra-4.1/target/ttl-remover-cassandra-4.1.jar"

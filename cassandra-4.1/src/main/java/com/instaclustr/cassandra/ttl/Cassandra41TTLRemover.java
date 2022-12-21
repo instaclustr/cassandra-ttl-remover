@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.Collections;
 
 import com.instaclustr.cassandra.ttl.cli.TTLRemovalException;
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
 import org.apache.cassandra.db.ClusteringBound;
 import org.apache.cassandra.db.LivenessInfo;
@@ -27,6 +28,7 @@ import org.apache.cassandra.io.sstable.SSTableRewriter;
 import org.apache.cassandra.io.sstable.format.SSTableFormat;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
+import org.apache.cassandra.io.util.File;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.TableMetadataRef;
@@ -34,12 +36,13 @@ import org.apache.cassandra.utils.FBUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Cassandra4TTLRemover implements SSTableTTLRemover {
+public class Cassandra41TTLRemover implements SSTableTTLRemover {
 
-    private static final Logger logger = LoggerFactory.getLogger(Cassandra4TTLRemover.class);
+    private static final Logger logger = LoggerFactory.getLogger(Cassandra41TTLRemover.class);
 
     @Override
     public void executeRemoval(final Path outputFolder, final Collection<Path> sstables, final String cql) throws Exception {
+        DatabaseDescriptor.toolInitialization(false);
 
         for (final Path sstable : sstables) {
             final Descriptor descriptor = Descriptor.fromFilename(sstable.toAbsolutePath().toFile().getAbsolutePath());
@@ -54,10 +57,10 @@ public class Cassandra4TTLRemover implements SSTableTTLRemover {
                 }
             }
 
-            final Descriptor resultDesc = new Descriptor(newSSTableDestinationDir.toFile(),
+            final Descriptor resultDesc = new Descriptor(new File(newSSTableDestinationDir),
                                                          descriptor.ksname,
                                                          descriptor.cfname,
-                                                         descriptor.generation,
+                                                         descriptor.id,
                                                          SSTableFormat.Type.BIG);
 
             final TableMetadata tableMetadata = CreateTableStatement.parse(cql, descriptor.ksname).partitioner(new Murmur3Partitioner()).build();

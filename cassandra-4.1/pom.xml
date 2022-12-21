@@ -10,11 +10,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>ttl-remover-cassandra-4.0.7</artifactId>
+    <artifactId>ttl-remover-cassandra-4.1.0</artifactId>
     <version>1.0</version>
 
     <properties>
-        <version.cassandra4>4.0.7</version.cassandra4>
+        <version.cassandra41>4.1.0</version.cassandra41>
 
         <version.embedded.cassandra>4.0.1</version.embedded.cassandra>
         <version.generator>1.5</version.generator>
@@ -44,7 +44,7 @@
         <dependency>
             <groupId>org.apache.cassandra</groupId>
             <artifactId>cassandra-all</artifactId>
-            <version>${version.cassandra4}</version>
+            <version>${version.cassandra41}</version>
             <scope>provided</scope>
         </dependency>
 
@@ -59,7 +59,7 @@
 
         <dependency>
             <groupId>com.instaclustr</groupId>
-            <artifactId>sstable-generator-cassandra-4-0-7</artifactId>
+            <artifactId>sstable-generator-cassandra-4-1-0</artifactId>
             <version>1.0</version>
             <scope>test</scope>
             <exclusions>
@@ -99,7 +99,7 @@
     </dependencies>
 
     <build>
-        <finalName>ttl-remover-cassandra-4</finalName>
+        <finalName>ttl-remover-cassandra-4.1</finalName>
     </build>
 
 </project>
